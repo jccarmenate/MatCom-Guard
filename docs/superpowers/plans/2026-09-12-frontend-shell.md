@@ -335,7 +335,9 @@ void guard_dial_set_progress(GtkWidget *dial, int current, int total, const char
 
 `guard_dial.c` now calls real GTK/Cairo/Pango functions inside `guard_dial_new`/`guard_dial_draw`, so — even though the test itself never calls those two functions — linking `guard_dial.c`'s object code into the test binary requires the GTK pkg-config flags from this point on (GTK's own pkg-config data pulls in Cairo and Pango transitively, the same way the project's main `Makefile` only lists `GTK_FLAGS` explicitly and still gets Pango for free):
 
-Run: `gcc -Wall -Wextra -std=c99 -Iinclude `pkg-config --cflags --libs gtk+-3.0` -o tests/unit/test_guard_dial_math tests/unit/test_guard_dial_math.c src/gui/widgets/guard_dial.c && ./tests/unit/test_guard_dial_math`
+Run: `gcc -Wall -Wextra -std=c99 -Iinclude -o tests/unit/test_guard_dial_math tests/unit/test_guard_dial_math.c src/gui/widgets/guard_dial.c `pkg-config --cflags --libs gtk+-3.0` && ./tests/unit/test_guard_dial_math`
+
+(Library flags come *after* the source files here — this Ubuntu toolchain links with `--as-needed` by default, which drops a shared library from the link if it appears before anything that references its symbols, producing undefined-reference errors. The project's own `Makefile` already puts `$(GTK_FLAGS)` after `$(SRC)` for exactly this reason — match that order in every ad-hoc command below, not just this one.)
 Expected: PASS, `test_guard_dial_math: OK`, zero compiler warnings.
 
 - [ ] **Step 4: Manual visual verification (not committed)**
@@ -374,7 +376,7 @@ int main(int argc, char **argv) {
 
 Run (from WSL, with a display available):
 ```bash
-gcc -Wall -Wextra -std=c99 -Iinclude `pkg-config --cflags --libs gtk+-3.0` -o /tmp/guard_dial_preview /tmp/guard_dial_preview.c src/gui/widgets/guard_dial.c
+gcc -Wall -Wextra -std=c99 -Iinclude -o /tmp/guard_dial_preview /tmp/guard_dial_preview.c src/gui/widgets/guard_dial.c `pkg-config --cflags --libs gtk+-3.0`
 GDK_BACKEND=x11 /tmp/guard_dial_preview
 ```
 Expected: a small window shows the dial, background ring, dashed inner ring, and an amber progress arc that grows and wraps around every ~4 seconds, with a percentage and "Vista previa del dial" text in the center. Close the window to exit. Delete `/tmp/guard_dial_preview.c` and `/tmp/guard_dial_preview` when done.
@@ -505,7 +507,7 @@ int main(void) {
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `gcc -Wall -Wextra -std=c99 -Iinclude `pkg-config --cflags --libs gobject-2.0` -o tests/unit/test_gui_thread_bridge tests/unit/test_gui_thread_bridge.c`
+Run: `gcc -Wall -Wextra -std=c99 -Iinclude -o tests/unit/test_gui_thread_bridge tests/unit/test_gui_thread_bridge.c `pkg-config --cflags --libs gobject-2.0``
 Expected: FAIL — `fatal error: gui_thread_bridge.h: No such file or directory`.
 
 - [ ] **Step 3: Write minimal implementation**
@@ -625,7 +627,7 @@ void gui_thread_bridge_post(const ProgressUpdate *update, void *user_data) {
 
 - [ ] **Step 4: Run test to verify it passes**
 
-Run: `gcc -Wall -Wextra -std=c99 -Iinclude `pkg-config --cflags --libs gobject-2.0` -o tests/unit/test_gui_thread_bridge tests/unit/test_gui_thread_bridge.c src/gui/gui_thread_bridge.c && ./tests/unit/test_gui_thread_bridge`
+Run: `gcc -Wall -Wextra -std=c99 -Iinclude -o tests/unit/test_gui_thread_bridge tests/unit/test_gui_thread_bridge.c src/gui/gui_thread_bridge.c `pkg-config --cflags --libs gobject-2.0` && ./tests/unit/test_gui_thread_bridge`
 Expected: PASS — all three `-> OK` lines print, zero compiler warnings.
 
 - [ ] **Step 5: Commit**
@@ -912,7 +914,7 @@ int main(int argc, char **argv) {
 
 Run (from WSL, from the repo root so the relative CSS path resolves):
 ```bash
-gcc -Wall -Wextra -std=c99 -Iinclude `pkg-config --cflags --libs gtk+-3.0` -o /tmp/gui_shell_preview /tmp/gui_shell_preview.c src/gui/gui_shell.c
+gcc -Wall -Wextra -std=c99 -Iinclude -o /tmp/gui_shell_preview /tmp/gui_shell_preview.c src/gui/gui_shell.c `pkg-config --cflags --libs gtk+-3.0`
 GDK_BACKEND=x11 /tmp/gui_shell_preview
 ```
 Expected: a window with a dark status bar at the top ("🛡️ MatCom Guard" + a teal "● SISTEMA SEGURO" badge), a narrow dark icon rail on the left with 5 buttons (first one shown highlighted in amber), and a content area on the right showing an empty area for page 0 and "📊 Dashboard — próximamente"-style text if you click any other rail icon. Clicking each rail button switches pages and highlights only that button. Close the window to exit. Delete `/tmp/gui_shell_preview.c` and `/tmp/gui_shell_preview` when done.
@@ -1253,11 +1255,11 @@ In `Makefile`, add these two target definitions next to the existing unit-test t
 
 ```makefile
 test-guard-dial-math: tests/unit/test_guard_dial_math.c src/gui/widgets/guard_dial.c
-	$(CC) $(UNIT_CFLAGS) $(GTK_FLAGS) -o tests/unit/test_guard_dial_math tests/unit/test_guard_dial_math.c src/gui/widgets/guard_dial.c
+	$(CC) $(UNIT_CFLAGS) -o tests/unit/test_guard_dial_math tests/unit/test_guard_dial_math.c src/gui/widgets/guard_dial.c $(GTK_FLAGS)
 	./tests/unit/test_guard_dial_math
 
 test-gui-thread-bridge: tests/unit/test_gui_thread_bridge.c src/gui/gui_thread_bridge.c
-	$(CC) $(UNIT_CFLAGS) `pkg-config --cflags --libs gobject-2.0` -o tests/unit/test_gui_thread_bridge tests/unit/test_gui_thread_bridge.c src/gui/gui_thread_bridge.c
+	$(CC) $(UNIT_CFLAGS) -o tests/unit/test_gui_thread_bridge tests/unit/test_gui_thread_bridge.c src/gui/gui_thread_bridge.c `pkg-config --cflags --libs gobject-2.0`
 	./tests/unit/test_gui_thread_bridge
 ```
 
