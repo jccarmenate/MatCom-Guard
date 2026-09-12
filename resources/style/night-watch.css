@@ -1,0 +1,51 @@
+box.nw-shell {
+    background-color: #12141C;
+}
+
+box.nw-status-bar {
+    background-color: #161927;
+    border-bottom: 1px solid #2A2E3D;
+    padding: 10px 14px;
+}
+
+label.nw-title {
+    color: #E8E6DE;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+label.nw-badge {
+    color: #4FB0A5;
+    background-color: rgba(79, 176, 165, 0.15);
+    border: 1px solid #4FB0A5;
+    border-radius: 10px;
+    padding: 3px 8px;
+    font-size: 10px;
+}
+
+box.nw-rail {
+    background-color: #12141C;
+    border-right: 1px solid #2A2E3D;
+    padding: 8px 0;
+}
+
+button.nw-rail-button {
+    background-color: transparent;
+    background-image: none;
+    border: 1px solid transparent;
+    color: #7d8496;
+    font-size: 16px;
+    padding: 6px;
+}
+
+button.nw-rail-button:checked {
+    background-color: rgba(217, 142, 63, 0.15);
+    border: 1px solid #D98E3F;
+    border-radius: 6px;
+    color: #D98E3F;
+}
+
+label.nw-placeholder {
+    color: #7d8496;
+    font-size: 14px;
+}
