@@ -5,6 +5,8 @@
 #include "gui_ports_integration.h"
 #include "gui_system_coordinator.h"
 #include "gui_backend_adapters.h"
+#include "gui_shell.h"
+#include "gui_demo_scan.h"
 #include <gtk/gtk.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,6 +34,8 @@ static gboolean gui_set_scanning_status_timeout(gpointer user_data);
 static gboolean intelligent_system_sync_timeout(gpointer user_data);
 
 static void on_window_destroy(GtkWidget *widget __attribute__((unused)), gpointer data __attribute__((unused))) {
+    gui_demo_scan_shutdown();
+
     gui_add_log_entry("SISTEMA", "INFO", "Cerrando MatCom Guard - iniciando secuencia de apagado seguro...");
     
     // Realizar limpieza completa del sistema backend
@@ -48,47 +52,16 @@ static void on_window_destroy(GtkWidget *widget __attribute__((unused)), gpointe
     gtk_main_quit();
 }
 
-static GtkWidget* create_main_notebook() {
-    // Crear el widget notebook que contendrá las pestañas
-    GtkWidget *nb = gtk_notebook_new();
-    gtk_notebook_set_tab_pos(GTK_NOTEBOOK(nb), GTK_POS_TOP);
-    
-    // Pestaña Panel de Control General
-    GtkWidget *dashboard_label = gtk_label_new("📊 Dashboard");
-    GtkWidget *dashboard_content = create_statistics_panel();
-    gtk_notebook_append_page(GTK_NOTEBOOK(nb), dashboard_content, dashboard_label);
-    
-    // Pestaña Monitoreo USB
-    GtkWidget *usb_label = gtk_label_new("💾 Dispositivos USB");
-    GtkWidget *usb_content = create_usb_panel();
-    gtk_notebook_append_page(GTK_NOTEBOOK(nb), usb_content, usb_label);
-    
-    // Pestaña Monitoreo de Procesos
-    GtkWidget *process_label = gtk_label_new("⚡ Procesos");
-    GtkWidget *process_content = create_process_panel();
-    gtk_notebook_append_page(GTK_NOTEBOOK(nb), process_content, process_label);
-    
-    // Pestaña Escaneo de Puertos
-    GtkWidget *ports_label = gtk_label_new("🔌 Puertos");
-    GtkWidget *ports_content = create_ports_panel();
-    gtk_notebook_append_page(GTK_NOTEBOOK(nb), ports_content, ports_label);
-    
-    // Pestaña Registros del Sistema
-    GtkWidget *logs_label = gtk_label_new("📝 Registros");
-    GtkWidget *logs_content = create_log_area();
-    gtk_notebook_append_page(GTK_NOTEBOOK(nb), logs_content, logs_label);
-    
-    return nb;
-}
-
 // Callbacks para los botones del header
 static void on_scan_all_clicked(GtkMenuItem *item __attribute__((unused)), gpointer data __attribute__((unused))) {
     gui_add_log_entry("SCANNER", "INFO", "Iniciando escaneo completo del sistema");
     gui_set_scanning_status(TRUE);
     
     // Cambiar a la pestaña de logs para ver el progreso
-    gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook), 4);
-    
+    if (notebook != NULL) {
+        gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook), 4);
+    }
+
     // Ejecutar todos los escaneos
     if (usb_callback) usb_callback();
     if (processes_callback) processes_callback();
@@ -107,8 +80,10 @@ static gboolean gui_set_scanning_status_timeout(gpointer user_data) {
 
 static void on_scan_usb_menu_clicked(GtkMenuItem *item __attribute__((unused)), gpointer data __attribute__((unused))) {
     // Cambiar a la pestaña USB
-    gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook), 1);
-    
+    if (notebook != NULL) {
+        gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook), 1);
+    }
+
     // Ejecutar escaneo
     if (usb_callback) {
         gui_add_log_entry("USB_SCANNER", "INFO", "Escaneo manual de USB iniciado desde menú");
@@ -118,8 +93,10 @@ static void on_scan_usb_menu_clicked(GtkMenuItem *item __attribute__((unused)), 
 
 static void on_scan_processes_menu_clicked(GtkMenuItem *item __attribute__((unused)), gpointer data __attribute__((unused))) {
     // Cambiar a la pestaña de procesos
-    gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook), 2);
-    
+    if (notebook != NULL) {
+        gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook), 2);
+    }
+
     // Ejecutar escaneo
     if (processes_callback) {
         gui_add_log_entry("PROCESS_SCANNER", "INFO", "Escaneo manual de procesos iniciado desde menú");
@@ -129,8 +106,10 @@ static void on_scan_processes_menu_clicked(GtkMenuItem *item __attribute__((unus
 
 static void on_scan_ports_menu_clicked(GtkMenuItem *item __attribute__((unused)), gpointer data __attribute__((unused))) {
     // Cambiar a la pestaña de puertos
-    gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook), 3);
-    
+    if (notebook != NULL) {
+        gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook), 3);
+    }
+
     // Ejecutar escaneo
     if (ports_callback) {
         gui_add_log_entry("PORT_SCANNER", "INFO", "Escaneo manual de puertos iniciado desde menú");
@@ -416,9 +395,14 @@ void init_gui(int argc, char **argv) {
     }
     gtk_container_add(GTK_CONTAINER(main_window), main_container);
 
-    notebook = create_main_notebook();
-    gtk_box_pack_start(GTK_BOX(main_container), notebook, TRUE, TRUE, 0);
-    
+    GtkWidget *shell = gui_shell_create();
+    gtk_box_pack_start(GTK_BOX(main_container), shell, TRUE, TRUE, 0);
+
+    GtkWidget *dashboard_page = gui_shell_get_page_container(0);
+    if (dashboard_page != NULL) {
+        gtk_box_pack_start(GTK_BOX(dashboard_page), gui_demo_scan_create_widget(), TRUE, TRUE, 0);
+    }
+
     status_bar = create_status_bar();
     gtk_box_pack_end(GTK_BOX(main_container), status_bar, FALSE, FALSE, 0);
     

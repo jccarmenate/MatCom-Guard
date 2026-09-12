@@ -10,6 +10,10 @@ SRC = src/main.c \
 		src/threadpool.c \
 		src/process_monitor.c \
 		src/device_monitor.c \
+		src/gui/widgets/guard_dial.c \
+		src/gui/gui_thread_bridge.c \
+		src/gui/gui_shell.c \
+		src/gui/gui_demo_scan.c \
 		src/gui/gui_main.c \
 		src/gui/window/gui_logging.c \
 		src/gui/window/gui_stats.c \
