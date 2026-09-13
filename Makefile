@@ -11,6 +11,7 @@ SRC = src/main.c \
 		src/process_monitor.c \
 		src/device_monitor.c \
 		src/gui/widgets/guard_dial.c \
+		src/gui/widgets/gui_icons.c \
 		src/gui/gui_thread_bridge.c \
 		src/gui/gui_periodic_worker.c \
 		src/gui/gui_shell.c \
