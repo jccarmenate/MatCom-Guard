@@ -16,7 +16,7 @@ SRC = src/main.c \
 		src/gui/gui_periodic_worker.c \
 		src/gui/gui_shell.c \
 		src/gui/gui_main.c \
-		src/gui/window/gui_logging.c \
+		src/gui/panels/gui_logs_panel.c \
 		src/gui/panels/gui_dashboard_panel.c \
 		src/gui/window/gui_status.c \
 		src/gui/window/gui_usb_panel.c \
@@ -93,8 +93,8 @@ test-gui-periodic-worker: tests/unit/test_gui_periodic_worker.c src/gui/gui_peri
 	$(CC) $(UNIT_CFLAGS) -o tests/unit/test_gui_periodic_worker tests/unit/test_gui_periodic_worker.c src/gui/gui_periodic_worker.c -lpthread
 	./tests/unit/test_gui_periodic_worker
 
-test-gui-backend-adapters: tests/unit/test_gui_backend_adapters.c src/gui/gui_backend_adapters.c src/gui/window/gui_logging.c src/gui/panels/gui_dashboard_panel.c src/device_monitor.c src/threadpool.c
-	$(CC) $(UNIT_CFLAGS) -o tests/unit/test_gui_backend_adapters tests/unit/test_gui_backend_adapters.c src/gui/gui_backend_adapters.c src/gui/window/gui_logging.c src/gui/panels/gui_dashboard_panel.c src/device_monitor.c src/threadpool.c `pkg-config --cflags --libs gtk+-3.0` -lcrypto -lpthread
+test-gui-backend-adapters: tests/unit/test_gui_backend_adapters.c src/gui/gui_backend_adapters.c src/gui/panels/gui_logs_panel.c src/gui/panels/gui_dashboard_panel.c src/device_monitor.c src/threadpool.c
+	$(CC) $(UNIT_CFLAGS) -o tests/unit/test_gui_backend_adapters tests/unit/test_gui_backend_adapters.c src/gui/gui_backend_adapters.c src/gui/panels/gui_logs_panel.c src/gui/panels/gui_dashboard_panel.c src/device_monitor.c src/threadpool.c `pkg-config --cflags --libs gtk+-3.0` -lcrypto -lpthread
 	./tests/unit/test_gui_backend_adapters
 
 test-unit: test-progress test-threadpool test-port-classification test-port-scan-range test-hash-skip test-process-shutdown test-guard-dial-math test-gui-thread-bridge test-gui-periodic-worker test-gui-backend-adapters

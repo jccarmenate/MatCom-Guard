@@ -7,6 +7,7 @@
 #include "gui_backend_adapters.h"
 #include "gui_shell.h"
 #include "gui_dashboard_panel.h"
+#include "gui_logs_panel.h"
 #include <gtk/gtk.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -399,6 +400,18 @@ void init_gui(int argc, char **argv) {
     GtkWidget *dashboard_page = gui_shell_get_page_container(0);
     if (dashboard_page != NULL) {
         gtk_box_pack_start(GTK_BOX(dashboard_page), gui_dashboard_panel_create(), TRUE, TRUE, 0);
+    }
+
+    GtkWidget *logs_page = gui_shell_get_page_container(4);
+    if (logs_page != NULL) {
+        GList *children = gtk_container_get_children(GTK_CONTAINER(logs_page));
+        for (GList *l = children; l != NULL; l = l->next) {
+            gtk_widget_destroy(GTK_WIDGET(l->data));
+        }
+        g_list_free(children);
+        gtk_widget_set_halign(logs_page, GTK_ALIGN_FILL);
+        gtk_widget_set_valign(logs_page, GTK_ALIGN_FILL);
+        gtk_box_pack_start(GTK_BOX(logs_page), gui_logs_panel_create(), TRUE, TRUE, 0);
     }
 
     status_bar = create_status_bar();

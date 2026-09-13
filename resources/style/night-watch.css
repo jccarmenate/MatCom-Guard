@@ -174,3 +174,9 @@ label.nw-row-badge-critical {
     background-color: rgba(192, 82, 74, 0.15);
     border: 1px solid #C0524A;
 }
+
+textview.nw-log-view,
+textview.nw-log-view text {
+    background-color: #1B1E29;
+    color: #E8E6DE;
+}
