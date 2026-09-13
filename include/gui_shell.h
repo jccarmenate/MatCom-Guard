@@ -11,6 +11,10 @@
  * empacar en cualquier GtkBox/ventana existente -- no crea su propia
  * ventana. Carga y aplica el stylesheet Night Watch la primera vez que se
  * llama.
+ *
+ * Solo puede existir un shell por proceso (el estado interno es estático)
+ * -- llamarla más de una vez sobrescribe el shell anterior y agrega un
+ * segundo GtkCssProvider a la pantalla.
  */
 GtkWidget *gui_shell_create(void);
 

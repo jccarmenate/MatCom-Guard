@@ -11,28 +11,36 @@ typedef struct {
     char phase[BRIDGE_PHASE_BUFFER];
     int current;
     int total;
-    // Copia mutable de target.watch: GLib la pone en NULL automáticamente
-    // si el objeto observado se destruye antes de que este mensaje se
-    // procese. target.watch en sí queda sin tocar, para poder distinguir
-    // "nunca hubo watch" (target.watch == NULL) de "había watch pero ya
-    // murió" (target.watch != NULL pero watch_slot == NULL).
-    GObject *watch_slot;
+    // GWeakRef es seguro de inicializar desde un hilo que no tiene su
+    // propia referencia fuerte al objeto observado -- a diferencia de
+    // g_object_add_weak_pointer(), que necesita tocar la memoria propia
+    // del objeto (su GData) para registrarse, lo cual sería inseguro si
+    // esa memoria ya fue liberada por un finalize concurrente, GWeakRef
+    // usa una tabla global indexada por el valor del puntero, protegida
+    // por el mismo lock que toma dispose(). Solo se inicializa si
+    // target.watch != NULL, y siempre se limpia con g_weak_ref_clear()
+    // antes de liberar el mensaje.
+    GWeakRef watch_ref;
 } BridgeMessage;
 
 static gboolean bridge_dispatch(gpointer data) {
     BridgeMessage *msg = (BridgeMessage *)data;
 
-    gboolean watch_still_alive = (msg->target.watch == NULL) || (msg->watch_slot != NULL);
-    if (watch_still_alive) {
-        if (msg->target.watch != NULL) {
-            g_object_remove_weak_pointer(msg->target.watch, (gpointer *)&msg->watch_slot);
+    gboolean should_deliver = TRUE;
+    if (msg->target.watch != NULL) {
+        gpointer still_alive = g_weak_ref_get(&msg->watch_ref);
+        if (still_alive != NULL) {
+            g_object_unref(still_alive);
+        } else {
+            should_deliver = FALSE;
         }
+        g_weak_ref_clear(&msg->watch_ref);
+    }
+
+    if (should_deliver) {
         ProgressUpdate copy = { .phase = msg->phase, .current = msg->current, .total = msg->total };
         msg->target.handler(&copy, msg->target.ui_user_data);
     }
-    // Si watch_still_alive es falso, el objeto observado ya fue finalizado:
-    // GLib ya limpió su propio registro de weak pointer, no hay nada que
-    // remover acá.
 
     free(msg);
     return G_SOURCE_REMOVE;
@@ -60,9 +68,8 @@ void gui_thread_bridge_post(const ProgressUpdate *update, void *user_data) {
         msg->phase[0] = '\0';
     }
 
-    msg->watch_slot = target->watch;
     if (target->watch != NULL) {
-        g_object_add_weak_pointer(target->watch, (gpointer *)&msg->watch_slot);
+        g_weak_ref_init(&msg->watch_ref, target->watch);
     }
 
     g_idle_add(bridge_dispatch, msg);

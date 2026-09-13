@@ -9,6 +9,7 @@ box.nw-status-bar {
 }
 
 label.nw-title {
+    font-family: Fraunces, Georgia, serif;
     color: #E8E6DE;
     font-weight: bold;
     font-size: 14px;

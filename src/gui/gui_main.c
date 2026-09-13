@@ -34,6 +34,12 @@ static gboolean gui_set_scanning_status_timeout(gpointer user_data);
 static gboolean intelligent_system_sync_timeout(gpointer user_data);
 
 static void on_window_destroy(GtkWidget *widget __attribute__((unused)), gpointer data __attribute__((unused))) {
+    // Debe ser lo primero: el hilo del escaneo demo tiene un puntero crudo
+    // al dial y registra un weak ref sobre él -- hay que unirlo (join)
+    // antes de que cualquier widget del árbol empiece a destruirse. La
+    // señal "destroy" corre en G_SIGNAL_RUN_CLEANUP, antes del cierre de
+    // clase de GtkContainer que destruye a los hijos, así que este orden
+    // es necesario, no solo conservador -- no lo muevas más abajo.
     gui_demo_scan_shutdown();
 
     gui_add_log_entry("SISTEMA", "INFO", "Cerrando MatCom Guard - iniciando secuencia de apagado seguro...");
@@ -433,7 +439,7 @@ void init_gui(int argc, char **argv) {
     printf("   🔄 Sistema completamente operativo\n");
     printf("===============================================\n");
     printf("   Ventana principal: %dx%d píxeles\n", 900, 600);
-    printf("   Pestañas disponibles: 5 (Dashboard, USB, Procesos, Puertos, Logs)\n");
+    printf("   Navegación: 5 secciones (Dashboard, USB, Procesos, Puertos, Logs)\n");
     printf("   Backend real: Totalmente integrado\n");
     printf("   Estado: LISTO PARA PROTECCIÓN EN TIEMPO REAL\n\n");
     

@@ -24,11 +24,18 @@ static void on_demo_scan_progress(const ProgressUpdate *update, void *ui_user_da
 }
 
 static gboolean on_scan_done_idle(gpointer data) {
+    pthread_join(scan_thread, NULL);
+
     ScanDoneMessage *msg = (ScanDoneMessage *)data;
 
     char summary[128];
-    snprintf(summary, sizeof(summary), "Listo: %d abiertos de %d",
-              msg->result.open_ports, msg->result.total_ports);
+    if (cancel_flag) {
+        snprintf(summary, sizeof(summary), "Cancelado (%d abiertos detectados)",
+                  msg->result.open_ports);
+    } else {
+        snprintf(summary, sizeof(summary), "Listo: %d abiertos de %d",
+                  msg->result.open_ports, msg->result.total_ports);
+    }
     guard_dial_set_progress(dial, msg->result.total_ports, msg->result.total_ports, summary);
 
     if (msg->result.ports != NULL) {
@@ -40,6 +47,16 @@ static gboolean on_scan_done_idle(gpointer data) {
     gtk_widget_set_sensitive(cancel_button, FALSE);
     scan_running = 0;
 
+    return G_SOURCE_REMOVE;
+}
+
+static gboolean on_scan_start_failed_idle(gpointer data) {
+    (void)data;
+    pthread_join(scan_thread, NULL);
+    gtk_widget_set_sensitive(scan_button, TRUE);
+    gtk_widget_set_sensitive(cancel_button, FALSE);
+    guard_dial_set_progress(dial, 0, 0, "No se pudo iniciar el escaneo");
+    scan_running = 0;
     return G_SOURCE_REMOVE;
 }
 
@@ -55,7 +72,7 @@ static void *demo_scan_thread_main(void *arg) {
     ScanDoneMessage *msg = malloc(sizeof(ScanDoneMessage));
     if (msg == NULL) {
         fprintf(stderr, "[gui_demo_scan] No se pudo asignar memoria para el resultado del escaneo\n");
-        scan_running = 0;
+        g_idle_add(on_scan_start_failed_idle, NULL);
         return NULL;
     }
 
@@ -82,7 +99,14 @@ static void on_scan_button_clicked(GtkButton *button, gpointer user_data) {
     gtk_widget_set_sensitive(scan_button, FALSE);
     gtk_widget_set_sensitive(cancel_button, TRUE);
     guard_dial_set_progress(dial, 0, 100, "Iniciando escaneo de prueba...");
-    pthread_create(&scan_thread, NULL, demo_scan_thread_main, NULL);
+
+    if (pthread_create(&scan_thread, NULL, demo_scan_thread_main, NULL) != 0) {
+        fprintf(stderr, "[gui_demo_scan] No se pudo crear el hilo de escaneo\n");
+        scan_running = 0;
+        gtk_widget_set_sensitive(scan_button, TRUE);
+        gtk_widget_set_sensitive(cancel_button, FALSE);
+        guard_dial_set_progress(dial, 0, 0, "No se pudo iniciar el escaneo");
+    }
 }
 
 static void on_cancel_button_clicked(GtkButton *button, gpointer user_data) {

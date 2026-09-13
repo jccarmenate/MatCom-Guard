@@ -83,7 +83,7 @@ static gboolean guard_dial_draw(GtkWidget *widget, cairo_t *cr, gpointer user_da
         int text_w, text_h;
 
         PangoLayout *percent_layout = pango_cairo_create_layout(cr);
-        PangoFontDescription *percent_font = pango_font_description_from_string("Georgia Bold 16");
+        PangoFontDescription *percent_font = pango_font_description_from_string("Fraunces,Georgia,serif Bold 16");
         pango_layout_set_font_description(percent_layout, percent_font);
         pango_layout_set_text(percent_layout, percent_text, -1);
         pango_layout_get_pixel_size(percent_layout, &text_w, &text_h);
