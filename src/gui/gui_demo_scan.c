@@ -145,6 +145,20 @@ void gui_demo_scan_shutdown(void) {
         return;
     }
     cancel_flag = 1;
+    // Antes de que este join retorne, el hilo ya llamó a g_idle_add() con
+    // on_scan_done_idle (o on_scan_start_failed_idle) como su último acto
+    // -- esa idle queda encolada en el GMainContext por defecto, y ESA
+    // función también hace su propio pthread_join(scan_thread, ...), lo
+    // cual sería un doble join (comportamiento indefinido) si alguna vez
+    // llegara a despacharse. Hoy es inalcanzable: on_window_destroy llama
+    // gtk_main_quit() justo después de esta función sin bombear el loop
+    // principal en el medio (no hay ningún gtk_main_iteration()/
+    // g_main_context_iteration() en todo el árbol de fuentes), así que esa
+    // idle nunca se despacha -- queda abandonada (fuga menor al cierre del
+    // proceso, sin doble join). Si alguna vez se bombea el loop entre esta
+    // llamada y gtk_main_quit(), o se llama a esta función desde otro
+    // lugar, hay que invalidar `scan_thread` acá para que las callbacks de
+    // idle detecten que ya fue unido y no lo intenten de nuevo.
     pthread_join(scan_thread, NULL);
     scan_running = 0;
 }
