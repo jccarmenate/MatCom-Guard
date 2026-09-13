@@ -6,7 +6,7 @@
 #include "gui_system_coordinator.h"
 #include "gui_backend_adapters.h"
 #include "gui_shell.h"
-#include "gui_demo_scan.h"
+#include "gui_dashboard_panel.h"
 #include <gtk/gtk.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -34,14 +34,6 @@ static gboolean gui_set_scanning_status_timeout(gpointer user_data);
 static gboolean intelligent_system_sync_timeout(gpointer user_data);
 
 static void on_window_destroy(GtkWidget *widget __attribute__((unused)), gpointer data __attribute__((unused))) {
-    // Debe ser lo primero: el hilo del escaneo demo tiene un puntero crudo
-    // al dial y registra un weak ref sobre él -- hay que unirlo (join)
-    // antes de que cualquier widget del árbol empiece a destruirse. La
-    // señal "destroy" corre en G_SIGNAL_RUN_CLEANUP, antes del cierre de
-    // clase de GtkContainer que destruye a los hijos, así que este orden
-    // es necesario, no solo conservador -- no lo muevas más abajo.
-    gui_demo_scan_shutdown();
-
     gui_add_log_entry("SISTEMA", "INFO", "Cerrando MatCom Guard - iniciando secuencia de apagado seguro...");
     
     // Realizar limpieza completa del sistema backend
@@ -406,7 +398,7 @@ void init_gui(int argc, char **argv) {
 
     GtkWidget *dashboard_page = gui_shell_get_page_container(0);
     if (dashboard_page != NULL) {
-        gtk_box_pack_start(GTK_BOX(dashboard_page), gui_demo_scan_create_widget(), TRUE, TRUE, 0);
+        gtk_box_pack_start(GTK_BOX(dashboard_page), gui_dashboard_panel_create(), TRUE, TRUE, 0);
     }
 
     status_bar = create_status_bar();

@@ -50,3 +50,127 @@ label.nw-placeholder {
     color: #7d8496;
     font-size: 14px;
 }
+
+box.nw-panel {
+    background-color: #12141C;
+    padding: 16px;
+}
+
+label.nw-panel-title {
+    font-family: Fraunces, Georgia, serif;
+    color: #E8E6DE;
+    font-weight: bold;
+    font-size: 16px;
+}
+
+box.nw-toolbar {
+    padding: 4px 0 12px 0;
+}
+
+button.nw-button-primary {
+    background-color: rgba(217, 142, 63, 0.15);
+    background-image: none;
+    border: 1px solid #D98E3F;
+    border-radius: 6px;
+    color: #D98E3F;
+    padding: 6px 14px;
+}
+
+button.nw-button-primary:disabled {
+    color: #7d8496;
+    border-color: #2A2E3D;
+    background-color: transparent;
+}
+
+button.nw-button-secondary {
+    background-color: transparent;
+    background-image: none;
+    border: 1px solid #2A2E3D;
+    border-radius: 6px;
+    color: #E8E6DE;
+    padding: 6px 14px;
+}
+
+button.nw-button-secondary:disabled {
+    color: #7d8496;
+}
+
+box.nw-stat-card {
+    background-color: #1B1E29;
+    border: 1px solid #2A2E3D;
+    border-radius: 8px;
+    padding: 14px;
+}
+
+label.nw-stat-value {
+    color: #E8E6DE;
+    font-weight: bold;
+    font-size: 22px;
+}
+
+label.nw-stat-value.nw-value-warning {
+    color: #D98E3F;
+}
+
+label.nw-stat-value.nw-value-critical {
+    color: #C0524A;
+}
+
+label.nw-stat-label {
+    color: #7d8496;
+    font-size: 11px;
+}
+
+box.nw-list-row {
+    background-color: #1B1E29;
+    border: 1px solid #2A2E3D;
+    border-radius: 6px;
+    padding: 8px 12px;
+}
+
+label.nw-row-dot-normal {
+    color: #4FB0A5;
+}
+
+label.nw-row-dot-warning {
+    color: #D98E3F;
+}
+
+label.nw-row-dot-critical {
+    color: #C0524A;
+}
+
+label.nw-row-primary {
+    color: #E8E6DE;
+    font-size: 13px;
+}
+
+label.nw-row-secondary {
+    font-family: monospace;
+    color: #7d8496;
+    font-size: 11px;
+}
+
+label.nw-row-badge {
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-size: 10px;
+}
+
+label.nw-row-badge-normal {
+    color: #4FB0A5;
+    background-color: rgba(79, 176, 165, 0.15);
+    border: 1px solid #4FB0A5;
+}
+
+label.nw-row-badge-warning {
+    color: #D98E3F;
+    background-color: rgba(217, 142, 63, 0.15);
+    border: 1px solid #D98E3F;
+}
+
+label.nw-row-badge-critical {
+    color: #C0524A;
+    background-color: rgba(192, 82, 74, 0.15);
+    border: 1px solid #C0524A;
+}
