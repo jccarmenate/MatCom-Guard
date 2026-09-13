@@ -2,7 +2,7 @@
 #include "gui.h"
 #include "gui_process_panel.h"
 #include "gui_usb_panel.h"
-#include "gui_ports_integration.h"
+#include "gui_ports_panel.h"
 #include "gui_system_coordinator.h"
 #include "gui_backend_adapters.h"
 #include "gui_shell.h"
@@ -41,6 +41,7 @@ static void on_window_destroy(GtkWidget *widget __attribute__((unused)), gpointe
     // antes de tocar el resto del sistema backend.
     gui_usb_panel_shutdown();
     gui_process_panel_shutdown();
+    gui_ports_panel_shutdown();
 
     // Realizar limpieza completa del sistema backend
     cleanup_complete_backend_system();
@@ -253,30 +254,23 @@ static int initialize_complete_backend_system(void) {
     }
     gui_add_log_entry("STARTUP", "INFO", "✅ Coordinador del sistema inicializado");
     
-    // Paso 2: Inicializar todas las integraciones de módulos
-    if (init_ports_integration() != 0) {
-        gui_add_log_entry("STARTUP", "ERROR", "Error al inicializar integración de puertos");
-        return -1;
-    }
-    gui_add_log_entry("STARTUP", "INFO", "✅ Integración de puertos inicializada");
-
-    // Paso 3: Iniciar servicios automáticos
+    // Paso 2: Iniciar servicios automáticos
     // USB: gui_usb_panel_create() ya inicio su propio monitoreo automatico
     // al montarse -- no requiere una llamada de "init" separada aca.
     // Procesos y Puertos: se inician bajo demanda cuando el usuario los solicita
-    notify_module_status_change("process", MODULE_STATUS_INACTIVE, 
+    notify_module_status_change("process", MODULE_STATUS_INACTIVE,
                                "Listo para iniciar bajo demanda");
-    notify_module_status_change("ports", MODULE_STATUS_INACTIVE, 
+    notify_module_status_change("ports", MODULE_STATUS_INACTIVE,
                                "Listo para iniciar bajo demanda");
-    
-    // Paso 4: Iniciar el coordinador del sistema
+
+    // Paso 3: Iniciar el coordinador del sistema
     if (start_system_coordinator(5) != 0) {  // 5 segundos de intervalo
         gui_add_log_entry("STARTUP", "CRITICAL", "FALLO CRÍTICO: No se pudo iniciar coordinador del sistema");
         return -1;
     }
     gui_add_log_entry("STARTUP", "INFO", "✅ Coordinador del sistema iniciado");
     
-    // Paso 5: Realizar sincronización inicial
+    // Paso 4: Realizar sincronización inicial
     gui_add_log_entry("STARTUP", "INFO", "Realizando sincronización inicial del sistema...");
     
     // Esperar un momento para que los módulos se estabilicen
@@ -300,12 +294,6 @@ static void cleanup_complete_backend_system(void) {
     gui_add_log_entry("SHUTDOWN", "INFO", "Deteniendo coordinador del sistema...");
     cleanup_system_coordinator();
     gui_add_log_entry("SHUTDOWN", "INFO", "✅ Coordinador del sistema finalizado");
-    
-    // Paso 2: Limpiar integraciones de módulos
-    gui_add_log_entry("SHUTDOWN", "INFO", "Finalizando módulos de integración...");
-    
-    cleanup_ports_integration();
-    gui_add_log_entry("SHUTDOWN", "INFO", "✅ Integración de puertos finalizada");
 
     gui_add_log_entry("SHUTDOWN", "INFO", "=== LIMPIEZA COMPLETA FINALIZADA ===");
 }
@@ -404,6 +392,18 @@ void init_gui(int argc, char **argv) {
         gtk_widget_set_halign(process_page, GTK_ALIGN_FILL);
         gtk_widget_set_valign(process_page, GTK_ALIGN_FILL);
         gtk_box_pack_start(GTK_BOX(process_page), gui_process_panel_create(), TRUE, TRUE, 0);
+    }
+
+    GtkWidget *ports_page = gui_shell_get_page_container(3);
+    if (ports_page != NULL) {
+        GList *children = gtk_container_get_children(GTK_CONTAINER(ports_page));
+        for (GList *l = children; l != NULL; l = l->next) {
+            gtk_widget_destroy(GTK_WIDGET(l->data));
+        }
+        g_list_free(children);
+        gtk_widget_set_halign(ports_page, GTK_ALIGN_FILL);
+        gtk_widget_set_valign(ports_page, GTK_ALIGN_FILL);
+        gtk_box_pack_start(GTK_BOX(ports_page), gui_ports_panel_create(), TRUE, TRUE, 0);
     }
 
     GtkWidget *logs_page = gui_shell_get_page_container(4);

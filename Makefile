@@ -20,13 +20,12 @@ SRC = src/main.c \
 		src/gui/panels/gui_dashboard_panel.c \
 		src/gui/panels/gui_usb_panel.c \
 		src/gui/panels/gui_process_panel.c \
+		src/gui/panels/gui_ports_panel.c \
 		src/gui/window/gui_status.c \
-		src/gui/window/gui_ports_panel.c \
 		src/gui/window/gui_config_dialog.c \
 		src/gui/integration/gui_system_coordinator.c \
-		src/gui/gui_backend_adapters.c \
-		src/gui/integration/gui_ports_integration.c
-		
+		src/gui/gui_backend_adapters.c
+
 .PHONY: all clean install test
 
 all: $(TARGET)
