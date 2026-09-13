@@ -63,6 +63,8 @@ dkms.conf
 /tests/unit/test_port_scan_range
 /tests/unit/test_hash_skip
 /tests/unit/test_process_shutdown
+/tests/unit/test_guard_dial_math
+/tests/unit/test_gui_thread_bridge
 /tests/unit/benchmark_port_scan
 
 # Brainstorming companion scratch files
