@@ -66,6 +66,7 @@ dkms.conf
 /tests/unit/test_guard_dial_math
 /tests/unit/test_gui_thread_bridge
 /tests/unit/test_gui_periodic_worker
+/tests/unit/test_gui_backend_adapters
 /tests/unit/benchmark_port_scan
 
 # Brainstorming companion scratch files

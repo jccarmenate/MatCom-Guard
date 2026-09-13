@@ -25,7 +25,7 @@ SRC = src/main.c \
 		src/gui/window/gui_ports_panel.c \
 		src/gui/window/gui_config_dialog.c \
 		src/gui/integration/gui_system_coordinator.c \
-		src/gui/integration/gui_backend_adapters.c \
+		src/gui/gui_backend_adapters.c \
 		src/gui/integration/gui_process_integration.c \
 		src/gui/integration/gui_ports_integration.c \
 		src/gui/integration/gui_usb_integration.c
@@ -39,7 +39,7 @@ $(TARGET): $(SRC)
 
 clean:
 	rm -f $(TARGET) *.o
-	rm -f tests/unit/test_progress tests/unit/test_threadpool tests/unit/test_port_classification tests/unit/test_port_scan_range tests/unit/test_hash_skip tests/unit/test_process_shutdown tests/unit/test_guard_dial_math tests/unit/test_gui_thread_bridge tests/unit/test_gui_periodic_worker tests/unit/benchmark_port_scan
+	rm -f tests/unit/test_progress tests/unit/test_threadpool tests/unit/test_port_classification tests/unit/test_port_scan_range tests/unit/test_hash_skip tests/unit/test_process_shutdown tests/unit/test_guard_dial_math tests/unit/test_gui_thread_bridge tests/unit/test_gui_periodic_worker tests/unit/test_gui_backend_adapters tests/unit/benchmark_port_scan
 
 install: $(TARGET)
 	sudo cp $(TARGET) /usr/local/bin/
@@ -94,10 +94,14 @@ test-gui-periodic-worker: tests/unit/test_gui_periodic_worker.c src/gui/gui_peri
 	$(CC) $(UNIT_CFLAGS) -o tests/unit/test_gui_periodic_worker tests/unit/test_gui_periodic_worker.c src/gui/gui_periodic_worker.c -lpthread
 	./tests/unit/test_gui_periodic_worker
 
-test-unit: test-progress test-threadpool test-port-classification test-port-scan-range test-hash-skip test-process-shutdown test-guard-dial-math test-gui-thread-bridge test-gui-periodic-worker
+test-gui-backend-adapters: tests/unit/test_gui_backend_adapters.c src/gui/gui_backend_adapters.c src/gui/window/gui_logging.c src/gui/window/gui_stats.c src/device_monitor.c src/threadpool.c
+	$(CC) $(UNIT_CFLAGS) -o tests/unit/test_gui_backend_adapters tests/unit/test_gui_backend_adapters.c src/gui/gui_backend_adapters.c src/gui/window/gui_logging.c src/gui/window/gui_stats.c src/device_monitor.c src/threadpool.c `pkg-config --cflags --libs gtk+-3.0` -lcrypto -lpthread
+	./tests/unit/test_gui_backend_adapters
+
+test-unit: test-progress test-threadpool test-port-classification test-port-scan-range test-hash-skip test-process-shutdown test-guard-dial-math test-gui-thread-bridge test-gui-periodic-worker test-gui-backend-adapters
 
 benchmark-port-scan: tests/unit/benchmark_port_scan.c src/port_scanner.c
 	$(CC) $(UNIT_CFLAGS) -O2 -o tests/unit/benchmark_port_scan tests/unit/benchmark_port_scan.c src/port_scanner.c src/threadpool.c -lpthread
 	./tests/unit/benchmark_port_scan
 
-.PHONY: test-unit test-progress test-threadpool test-port-classification test-port-scan-range test-hash-skip test-process-shutdown test-guard-dial-math test-gui-thread-bridge test-gui-periodic-worker benchmark-port-scan
+.PHONY: test-unit test-progress test-threadpool test-port-classification test-port-scan-range test-hash-skip test-process-shutdown test-guard-dial-math test-gui-thread-bridge test-gui-periodic-worker test-gui-backend-adapters benchmark-port-scan

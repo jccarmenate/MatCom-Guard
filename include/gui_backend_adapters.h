@@ -182,6 +182,13 @@ int generate_usb_status_string(int files_changed, gboolean is_suspicious,
  */
 int generate_port_status_string(int is_open, char *status_buffer, size_t buffer_size);
 
+/**
+ * @brief Copia `src` a `dest` truncando a lo sumo en `dest_size - 1` bytes,
+ * sin partir una secuencia UTF-8 multibyte a la mitad. `dest` siempre queda
+ * terminado en '\0'. Seguro con dest_size == 0 (no escribe nada).
+ */
+void utf8_safe_truncate(const char *src, char *dest, size_t dest_size);
+
 // ============================================================================
 // EXPORTACIÓN DE REPORTES
 // ============================================================================
