@@ -1,4 +1,5 @@
 #include "gui_shell.h"
+#include "gui_icons.h"
 #include <stdio.h>
 
 #define GUI_SHELL_PAGE_COUNT 5
@@ -11,8 +12,8 @@ static GtkWidget *content_stack = NULL;
 static const char *page_names[GUI_SHELL_PAGE_COUNT] = {
     "page0", "page1", "page2", "page3", "page4"
 };
-static const char *page_icons[GUI_SHELL_PAGE_COUNT] = {
-    "\xF0\x9F\x93\x8A", "\xF0\x9F\x92\xBE", "\xE2\x9A\xA1", "\xF0\x9F\x94\x8C", "\xF0\x9F\x93\x9C"
+static const GuiIconType page_icon_types[GUI_SHELL_PAGE_COUNT] = {
+    GUI_ICON_DASHBOARD, GUI_ICON_USB, GUI_ICON_PROCESSES, GUI_ICON_PORTS, GUI_ICON_LOGS
 };
 static const char *page_labels[GUI_SHELL_PAGE_COUNT] = {
     "Dashboard", "Dispositivos USB", "Procesos", "Puertos", "Registros"
@@ -68,9 +69,13 @@ static GtkWidget *create_icon_rail(void) {
     gtk_widget_set_size_request(rail, 44, -1);
 
     for (int i = 0; i < GUI_SHELL_PAGE_COUNT; i++) {
-        GtkWidget *btn = gtk_toggle_button_new_with_label(page_icons[i]);
+        GtkWidget *btn = gtk_toggle_button_new();
         gtk_style_context_add_class(gtk_widget_get_style_context(btn), "nw-rail-button");
         gtk_widget_set_tooltip_text(btn, page_labels[i]);
+
+        GtkWidget *icon = gui_icon_widget_new(page_icon_types[i], GTK_TOGGLE_BUTTON(btn));
+        gtk_container_add(GTK_CONTAINER(btn), icon);
+
         g_signal_connect(btn, "toggled", G_CALLBACK(on_rail_button_toggled), GINT_TO_POINTER(i));
         rail_buttons[i] = btn;
         gtk_box_pack_start(GTK_BOX(rail), btn, FALSE, FALSE, 0);
@@ -102,7 +107,7 @@ static void create_content_stack(void) {
             page_containers[i] = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
         } else {
             char message[128];
-            snprintf(message, sizeof(message), "%s %s \xE2\x80\x94 pr\xC3\xB3ximamente", page_icons[i], page_labels[i]);
+            snprintf(message, sizeof(message), "%s \xE2\x80\x94 pr\xC3\xB3ximamente", page_labels[i]);
             page_containers[i] = create_placeholder_page(message);
         }
         gtk_stack_add_named(GTK_STACK(content_stack), page_containers[i], page_names[i]);
