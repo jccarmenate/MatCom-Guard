@@ -1,6 +1,6 @@
 #include "gui_internal.h"
 #include "gui.h"
-#include "gui_process_integration.h"
+#include "gui_process_panel.h"
 #include "gui_usb_panel.h"
 #include "gui_ports_integration.h"
 #include "gui_system_coordinator.h"
@@ -40,6 +40,7 @@ static void on_window_destroy(GtkWidget *widget __attribute__((unused)), gpointe
     // Detener el panel USB (monitoreo automatico + escaneo manual en curso)
     // antes de tocar el resto del sistema backend.
     gui_usb_panel_shutdown();
+    gui_process_panel_shutdown();
 
     // Realizar limpieza completa del sistema backend
     cleanup_complete_backend_system();
@@ -253,12 +254,6 @@ static int initialize_complete_backend_system(void) {
     gui_add_log_entry("STARTUP", "INFO", "✅ Coordinador del sistema inicializado");
     
     // Paso 2: Inicializar todas las integraciones de módulos
-    if (init_process_integration() != 0) {
-        gui_add_log_entry("STARTUP", "ERROR", "Error al inicializar integración de procesos");
-        return -1;
-    }
-    gui_add_log_entry("STARTUP", "INFO", "✅ Integración de procesos inicializada");
-    
     if (init_ports_integration() != 0) {
         gui_add_log_entry("STARTUP", "ERROR", "Error al inicializar integración de puertos");
         return -1;
@@ -312,9 +307,6 @@ static void cleanup_complete_backend_system(void) {
     cleanup_ports_integration();
     gui_add_log_entry("SHUTDOWN", "INFO", "✅ Integración de puertos finalizada");
 
-    cleanup_process_integration();
-    gui_add_log_entry("SHUTDOWN", "INFO", "✅ Integración de procesos finalizada");
-    
     gui_add_log_entry("SHUTDOWN", "INFO", "=== LIMPIEZA COMPLETA FINALIZADA ===");
 }
 
@@ -400,6 +392,18 @@ void init_gui(int argc, char **argv) {
         gtk_widget_set_halign(usb_page, GTK_ALIGN_FILL);
         gtk_widget_set_valign(usb_page, GTK_ALIGN_FILL);
         gtk_box_pack_start(GTK_BOX(usb_page), gui_usb_panel_create(), TRUE, TRUE, 0);
+    }
+
+    GtkWidget *process_page = gui_shell_get_page_container(2);
+    if (process_page != NULL) {
+        GList *children = gtk_container_get_children(GTK_CONTAINER(process_page));
+        for (GList *l = children; l != NULL; l = l->next) {
+            gtk_widget_destroy(GTK_WIDGET(l->data));
+        }
+        g_list_free(children);
+        gtk_widget_set_halign(process_page, GTK_ALIGN_FILL);
+        gtk_widget_set_valign(process_page, GTK_ALIGN_FILL);
+        gtk_box_pack_start(GTK_BOX(process_page), gui_process_panel_create(), TRUE, TRUE, 0);
     }
 
     GtkWidget *logs_page = gui_shell_get_page_container(4);
