@@ -18,16 +18,15 @@ SRC = src/main.c \
 		src/gui/gui_main.c \
 		src/gui/panels/gui_logs_panel.c \
 		src/gui/panels/gui_dashboard_panel.c \
+		src/gui/panels/gui_usb_panel.c \
 		src/gui/window/gui_status.c \
-		src/gui/window/gui_usb_panel.c \
 		src/gui/window/gui_process_panel.c \
 		src/gui/window/gui_ports_panel.c \
 		src/gui/window/gui_config_dialog.c \
 		src/gui/integration/gui_system_coordinator.c \
 		src/gui/gui_backend_adapters.c \
 		src/gui/integration/gui_process_integration.c \
-		src/gui/integration/gui_ports_integration.c \
-		src/gui/integration/gui_usb_integration.c
+		src/gui/integration/gui_ports_integration.c
 		
 .PHONY: all clean install test
 

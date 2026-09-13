@@ -180,3 +180,16 @@ textview.nw-log-view text {
     background-color: #1B1E29;
     color: #E8E6DE;
 }
+
+/* GtkListBox (nodo CSS "list") hereda el fondo blanco de .view del tema
+   base -- sin esto, cualquier lista (p.ej. la de dispositivos USB) muestra
+   un rectangulo claro que rompe el tema oscuro Night Watch, sobre todo
+   antes de que se agregue ninguna fila. */
+list {
+    background-color: #12141C;
+    color: #E8E6DE;
+}
+
+list row {
+    background-color: transparent;
+}

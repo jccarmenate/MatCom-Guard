@@ -1,7 +1,7 @@
 #include "gui_internal.h"
 #include "gui.h"
 #include "gui_process_integration.h"
-#include "gui_usb_integration.h"
+#include "gui_usb_panel.h"
 #include "gui_ports_integration.h"
 #include "gui_system_coordinator.h"
 #include "gui_backend_adapters.h"
@@ -36,7 +36,11 @@ static gboolean intelligent_system_sync_timeout(gpointer user_data);
 
 static void on_window_destroy(GtkWidget *widget __attribute__((unused)), gpointer data __attribute__((unused))) {
     gui_add_log_entry("SISTEMA", "INFO", "Cerrando MatCom Guard - iniciando secuencia de apagado seguro...");
-    
+
+    // Detener el panel USB (monitoreo automatico + escaneo manual en curso)
+    // antes de tocar el resto del sistema backend.
+    gui_usb_panel_shutdown();
+
     // Realizar limpieza completa del sistema backend
     cleanup_complete_backend_system();
     
@@ -255,30 +259,15 @@ static int initialize_complete_backend_system(void) {
     }
     gui_add_log_entry("STARTUP", "INFO", "✅ Integración de procesos inicializada");
     
-    if (init_usb_integration() != 0) {
-        gui_add_log_entry("STARTUP", "ERROR", "Error al inicializar integración USB");
-        return -1;
-    }
-    gui_add_log_entry("STARTUP", "INFO", "✅ Integración USB inicializada");
-    
     if (init_ports_integration() != 0) {
         gui_add_log_entry("STARTUP", "ERROR", "Error al inicializar integración de puertos");
         return -1;
     }
     gui_add_log_entry("STARTUP", "INFO", "✅ Integración de puertos inicializada");
-    
+
     // Paso 3: Iniciar servicios automáticos
-    // USB: monitoreo automático para detectar dispositivos conectados/desconectados
-    if (start_usb_monitoring(30) != 0) {  // 30 segundos de intervalo
-        gui_add_log_entry("STARTUP", "WARNING", "No se pudo iniciar monitoreo automático USB");
-    } else {
-        gui_add_log_entry("STARTUP", "INFO", "✅ Monitoreo automático USB iniciado");
-        
-        // Notificar al coordinador sobre el cambio de estado
-        notify_module_status_change("usb", MODULE_STATUS_ACTIVE, 
-                                   "Monitoreo automático iniciado exitosamente");
-    }
-    
+    // USB: gui_usb_panel_create() ya inicio su propio monitoreo automatico
+    // al montarse -- no requiere una llamada de "init" separada aca.
     // Procesos y Puertos: se inician bajo demanda cuando el usuario los solicita
     notify_module_status_change("process", MODULE_STATUS_INACTIVE, 
                                "Listo para iniciar bajo demanda");
@@ -322,10 +311,7 @@ static void cleanup_complete_backend_system(void) {
     
     cleanup_ports_integration();
     gui_add_log_entry("SHUTDOWN", "INFO", "✅ Integración de puertos finalizada");
-    
-    cleanup_usb_integration();
-    gui_add_log_entry("SHUTDOWN", "INFO", "✅ Integración USB finalizada");
-    
+
     cleanup_process_integration();
     gui_add_log_entry("SHUTDOWN", "INFO", "✅ Integración de procesos finalizada");
     
@@ -364,11 +350,13 @@ static void intelligent_system_sync(void) {
     if (is_process_monitoring_active()) {
         sync_gui_with_backend_processes();
     }
-    
-    if (is_usb_monitoring_active()) {
-        sync_gui_with_usb_devices();
-    }
-    
+
+    // USB: gui_usb_panel ya mantiene su propia lista sincronizada en vivo
+    // (cada cambio de estado se publica via post_usb_device_update() apenas
+    // ocurre, tanto desde el escaneo manual como desde el monitor
+    // automatico) -- no existe (ni hace falta) un sync_gui_with_usb_devices()
+    // independiente como el que exponia gui_usb_integration.c.
+
     // Los puertos se sincronizan automáticamente cuando hay resultados disponibles
     
     gui_add_log_entry("SYNC", "INFO", "Sincronización inteligente completada");
@@ -400,6 +388,18 @@ void init_gui(int argc, char **argv) {
     GtkWidget *dashboard_page = gui_shell_get_page_container(0);
     if (dashboard_page != NULL) {
         gtk_box_pack_start(GTK_BOX(dashboard_page), gui_dashboard_panel_create(), TRUE, TRUE, 0);
+    }
+
+    GtkWidget *usb_page = gui_shell_get_page_container(1);
+    if (usb_page != NULL) {
+        GList *children = gtk_container_get_children(GTK_CONTAINER(usb_page));
+        for (GList *l = children; l != NULL; l = l->next) {
+            gtk_widget_destroy(GTK_WIDGET(l->data));
+        }
+        g_list_free(children);
+        gtk_widget_set_halign(usb_page, GTK_ALIGN_FILL);
+        gtk_widget_set_valign(usb_page, GTK_ALIGN_FILL);
+        gtk_box_pack_start(GTK_BOX(usb_page), gui_usb_panel_create(), TRUE, TRUE, 0);
     }
 
     GtkWidget *logs_page = gui_shell_get_page_container(4);
