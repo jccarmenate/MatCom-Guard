@@ -54,7 +54,7 @@ make check-deps
 - 🔌 **Port Scanner**: quick scan (1-1024) and full scan (1-65535)
 - 📊 **Dashboard**: a consolidated view of system status
 - 📄 **Export PDF**: professional reports with one click
-- ⚙️ **Configuration**: `matcomguard.conf` for the backend, plus an in-app "Configuración" dialog
+- ⚙️ **Configuration**: one shared file, editable via the in-app "Configuración" dialog
 
 ## 📸 Screenshots
 
@@ -284,7 +284,6 @@ sudo ./matcom-guard
 ```
 MatCom-Guard-SO-Project/
 ├── Makefile                       # Build system
-├── matcomguard.conf                # Backend config file (thresholds, whitelist)
 ├── README.md / README.es.md       # This documentation
 ├── include/                       # Project headers
 │   ├── device_monitor.h           # USB device monitor
@@ -393,25 +392,36 @@ Suspicious Activity:
 
 ### **⚙️ Flexible Configuration**
 
-There are two independent configuration surfaces today:
+A single config file, `~/.config/matcom-guard/matcomguard.conf`, is read
+once at startup and shared by the backend and the GUI's "Configuración"
+dialog (top action bar) — both read and write the exact same in-memory
+struct, so there's no risk of the two disagreeing on a threshold:
 
-**Backend config** — `matcomguard.conf` (project root), read by `process_monitor.c`
-at startup:
 ```properties
-# File: matcomguard.conf
-UMBRAL_CPU=70.0          # CPU threshold for the backend's own alert loop (%)
-UMBRAL_RAM=50.0          # Memory threshold for the backend's own alert loop (%)
-INTERVALO=5              # Monitoring interval (seconds)
-DURACION_ALERTA=10       # Alert duration (seconds)
-WHITELIST=systemd,kthreadd,ksoftirqd,migration,rcu_gp,rcu_par_gp,watchdog,stress,yes
+# File: ~/.config/matcom-guard/matcomguard.conf
+UMBRAL_CPU=70.0                    # CPU threshold — drives the backend's real
+                                    # alert loop AND the Process panel's row coloring
+UMBRAL_RAM=50.0                    # Same, for memory
+INTERVALO=5                        # Backend's own process-monitoring tick rate (seconds)
+DURACION_ALERTA=10                 # Alert duration (seconds)
+INTERVALO_ESCANEO_USB=30           # Below: editable from the dialog's other tabs,
+INTERVALO_ESCANEO_PROCESOS=5       # persisted, but not yet consumed by any scan --
+INTERVALO_ESCANEO_PUERTOS=300      # see the dialog's own tabs for what each controls
+AUTO_ESCANEO_USB=1
+AUTO_ESCANEO_PROCESOS=1
+AUTO_ESCANEO_PUERTOS=0
+ALERTAS_SONORAS=1
+NOTIFICACIONES=1
+GUARDAR_LOGS=1
+RANGO_PUERTOS_INICIO=1
+RANGO_PUERTOS_FIN=1024
+WHITELIST=systemd,kthreadd,ksoftirqd,migration,rcu_gp,rcu_par_gp,watchdog,stress
 ```
 
-**GUI config** — the "Configuración" dialog (top action bar), persisted to
-`~/.config/matcom-guard/config.ini`. Its **Umbrales** tab (CPU/memory
-thresholds) drives the Process panel's row coloring directly. The other tabs
-(scan intervals, auto-scan toggles, sound/notifications, port range,
-whitelist) are stored and editable, but nothing currently reads them back
-into scan behavior — they're not wired to the backend yet.
+Only `UMBRAL_CPU`/`UMBRAL_RAM`/`WHITELIST` currently affect scan behavior end
+to end. The rest of the dialog's settings (scan intervals, auto-scan
+toggles, sound/notifications, port range) are stored and editable but not
+yet wired into scan behavior.
 
 ### **🛡️ Thread-Safe Security**
 

@@ -9,6 +9,7 @@
 #include <pthread.h>
 #include <errno.h>
 #include <sys/sysinfo.h>
+#include <sys/stat.h>
 #include "process_monitor.h"
 
 // ===== VARIABLES GLOBALES =====
@@ -45,6 +46,7 @@ static unsigned long get_total_system_memory(void);
 static void get_stat_file_path(pid_t pid, char *path, size_t size);
 static void read_prev_times(pid_t pid, unsigned long *prev_user_time, unsigned long *prev_sys_time);
 static void write_prev_times(pid_t pid, unsigned long prev_user_time, unsigned long prev_sys_time);
+static void get_config_path(char *path, size_t size);
 
 // Funciones de gestión de procesos internos
 static int find_process(pid_t pid);
@@ -63,19 +65,46 @@ static void* monitoring_thread_function(void* arg);
 
 // ===== FUNCIONES DE CONFIGURACIÓN =====
 
+// Archivo único de configuración, compartido con el dialogo de la GUI --
+// antes vivia en ./matcomguard.conf (relativo al directorio de arranque,
+// fragil) y la GUI guardaba un config.ini aparte con formato distinto;
+// ahora ambos leen/escriben el mismo archivo con este mismo formato simple.
+static void get_config_path(char *path, size_t size) {
+    const char *home = getenv("HOME");
+    if (home && *home) {
+        snprintf(path, size, "%s/.config/matcom-guard/matcomguard.conf", home);
+    } else {
+        snprintf(path, size, "./matcomguard.conf");
+    }
+}
+
 void load_config(void) {
     pthread_mutex_lock(&mutex);
 
-    // Valores predeterminados
-    config.max_cpu_usage = 90.0;
-    config.max_ram_usage = 80.0;
+    // Valores predeterminados (los mismos que ofrece "Valores por Defecto"
+    // en el dialogo de configuracion de la GUI)
+    config.max_cpu_usage = 70.0;
+    config.max_ram_usage = 50.0;
     config.check_interval = 30;
     config.alert_duration = 10;
     config.num_white_processes = 0;
     config.white_list = NULL;
+    config.usb_scan_interval = 30;
+    config.process_scan_interval = 5;
+    config.port_scan_interval = 300;
+    config.auto_scan_usb = 1;
+    config.auto_scan_processes = 1;
+    config.auto_scan_ports = 0;
+    config.enable_sound_alerts = 1;
+    config.enable_notifications = 1;
+    config.log_to_file = 1;
+    config.port_scan_start = 1;
+    config.port_scan_end = 1024;
 
     // Cargar desde archivo
-    FILE *conf = fopen(CONFIG_PATH, "r");
+    char config_path[512];
+    get_config_path(config_path, sizeof(config_path));
+    FILE *conf = fopen(config_path, "r");
     if (!conf) {
         printf("[INFO] No se encontró archivo de configuración, usando valores predeterminados\n");
         pthread_mutex_unlock(&mutex);
@@ -87,30 +116,64 @@ void load_config(void) {
         // Actualiza el umbral para alertas de uso de CPU
         if (strstr(line, "UMBRAL_CPU=")) {
             sscanf(line, "UMBRAL_CPU=%f", &config.max_cpu_usage);
-        } 
+        }
         // Actualiza el umbral para alertas de uso de RAM
         else if (strstr(line, "UMBRAL_RAM=")) {
             sscanf(line, "UMBRAL_RAM=%f", &config.max_ram_usage);
-        } 
+        }
         // Actualiza el intervalo de realización de chequeos
         else if (strstr(line, "INTERVALO=")) {
             sscanf(line, "INTERVALO=%d", &config.check_interval);
-        } 
+        }
         // Actualiza la duración del estado de alerta
         else if (strstr(line, "DURACION_ALERTA=")) {
             sscanf(line, "DURACION_ALERTA=%d", &config.alert_duration);
-        } 
+        }
+        // Ajustes editables desde el dialogo de configuracion de la GUI
+        else if (strstr(line, "INTERVALO_ESCANEO_USB=")) {
+            sscanf(line, "INTERVALO_ESCANEO_USB=%d", &config.usb_scan_interval);
+        }
+        else if (strstr(line, "INTERVALO_ESCANEO_PROCESOS=")) {
+            sscanf(line, "INTERVALO_ESCANEO_PROCESOS=%d", &config.process_scan_interval);
+        }
+        else if (strstr(line, "INTERVALO_ESCANEO_PUERTOS=")) {
+            sscanf(line, "INTERVALO_ESCANEO_PUERTOS=%d", &config.port_scan_interval);
+        }
+        else if (strstr(line, "AUTO_ESCANEO_USB=")) {
+            sscanf(line, "AUTO_ESCANEO_USB=%d", &config.auto_scan_usb);
+        }
+        else if (strstr(line, "AUTO_ESCANEO_PROCESOS=")) {
+            sscanf(line, "AUTO_ESCANEO_PROCESOS=%d", &config.auto_scan_processes);
+        }
+        else if (strstr(line, "AUTO_ESCANEO_PUERTOS=")) {
+            sscanf(line, "AUTO_ESCANEO_PUERTOS=%d", &config.auto_scan_ports);
+        }
+        else if (strstr(line, "ALERTAS_SONORAS=")) {
+            sscanf(line, "ALERTAS_SONORAS=%d", &config.enable_sound_alerts);
+        }
+        else if (strstr(line, "NOTIFICACIONES=")) {
+            sscanf(line, "NOTIFICACIONES=%d", &config.enable_notifications);
+        }
+        else if (strstr(line, "GUARDAR_LOGS=")) {
+            sscanf(line, "GUARDAR_LOGS=%d", &config.log_to_file);
+        }
+        else if (strstr(line, "RANGO_PUERTOS_INICIO=")) {
+            sscanf(line, "RANGO_PUERTOS_INICIO=%d", &config.port_scan_start);
+        }
+        else if (strstr(line, "RANGO_PUERTOS_FIN=")) {
+            sscanf(line, "RANGO_PUERTOS_FIN=%d", &config.port_scan_end);
+        }
         // Actualiza los procesos a tener en cuenta en la lista blanca
         else if (strstr(line, "WHITELIST=")) {
             char *list = strchr(line, '=') + 1;
             list[strcspn(list, "\n")] = 0;
-            
+
             // Tokenizar la lista de procesos
-            char *token = strtok(list, ",");            
-            
+            char *token = strtok(list, ",");
+
             while (token) {
                 // Usar temp pointer para evitar perder referencia en caso de fallo de realloc
-                char **temp_list = realloc(config.white_list, 
+                char **temp_list = realloc(config.white_list,
                                           (config.num_white_processes + 1) * sizeof(char*));
                 if (temp_list) {
                     config.white_list = temp_list;
@@ -147,15 +210,35 @@ Config* get_config() {
 }
 
 /**
- * Guarda la configuración actual en el archivo matcomguard.conf
- * Mantiene persistencia entre sesiones
+ * Guarda la configuración actual en matcomguard.conf (bajo
+ * ~/.config/matcom-guard/). Mantiene persistencia entre sesiones.
  */
 void save_config(void) {
     pthread_mutex_lock(&mutex);
 
-    FILE *conf = fopen(CONFIG_PATH, "w");
+    char config_path[512];
+    get_config_path(config_path, sizeof(config_path));
+
+    // Crear ~/.config/matcom-guard/ si todavia no existe (primera vez que
+    // se guarda). mkdir() con EEXIST no es un error real aca.
+    char config_dir[512];
+    snprintf(config_dir, sizeof(config_dir), "%s", config_path);
+    char *last_slash = strrchr(config_dir, '/');
+    if (last_slash) {
+        *last_slash = '\0';
+        char parent_dir[512];
+        snprintf(parent_dir, sizeof(parent_dir), "%s", config_dir);
+        char *parent_slash = strrchr(parent_dir, '/');
+        if (parent_slash) {
+            *parent_slash = '\0';
+            mkdir(parent_dir, 0755); // ej. ~/.config
+        }
+        mkdir(config_dir, 0755); // ej. ~/.config/matcom-guard
+    }
+
+    FILE *conf = fopen(config_path, "w");
     if (!conf) {
-        printf("[ERROR] No se pudo abrir %s para escritura\n", CONFIG_PATH);
+        printf("[ERROR] No se pudo abrir %s para escritura\n", config_path);
         pthread_mutex_unlock(&mutex);
         return;
     }
@@ -165,6 +248,17 @@ void save_config(void) {
     fprintf(conf, "UMBRAL_RAM=%.1f\n", config.max_ram_usage);
     fprintf(conf, "INTERVALO=%d\n", config.check_interval);
     fprintf(conf, "DURACION_ALERTA=%d\n", config.alert_duration);
+    fprintf(conf, "INTERVALO_ESCANEO_USB=%d\n", config.usb_scan_interval);
+    fprintf(conf, "INTERVALO_ESCANEO_PROCESOS=%d\n", config.process_scan_interval);
+    fprintf(conf, "INTERVALO_ESCANEO_PUERTOS=%d\n", config.port_scan_interval);
+    fprintf(conf, "AUTO_ESCANEO_USB=%d\n", config.auto_scan_usb);
+    fprintf(conf, "AUTO_ESCANEO_PROCESOS=%d\n", config.auto_scan_processes);
+    fprintf(conf, "AUTO_ESCANEO_PUERTOS=%d\n", config.auto_scan_ports);
+    fprintf(conf, "ALERTAS_SONORAS=%d\n", config.enable_sound_alerts);
+    fprintf(conf, "NOTIFICACIONES=%d\n", config.enable_notifications);
+    fprintf(conf, "GUARDAR_LOGS=%d\n", config.log_to_file);
+    fprintf(conf, "RANGO_PUERTOS_INICIO=%d\n", config.port_scan_start);
+    fprintf(conf, "RANGO_PUERTOS_FIN=%d\n", config.port_scan_end);
 
     // Escribir la whitelist
     fprintf(conf, "WHITELIST=");
@@ -177,7 +271,7 @@ void save_config(void) {
     fprintf(conf, "\n");
 
     fclose(conf);
-    printf("[INFO] Configuración guardada en %s\n", CONFIG_PATH);
+    printf("[INFO] Configuración guardada en %s\n", config_path);
 
     pthread_mutex_unlock(&mutex);
 }

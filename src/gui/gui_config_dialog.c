@@ -1,56 +1,66 @@
 // src/gui/gui_config_dialog.c
+#define _GNU_SOURCE // strdup() en whitelist_from_string()
+//
+// Esta ventana ya no es dueña de ningún estado de configuración propio --
+// lee y escribe directamente el Config compartido de process_monitor.h
+// (mismo struct, mismo archivo matcomguard.conf que usa el backend para su
+// propio bucle de alertas). Antes este diálogo mantenía su propia copia en
+// un formato distinto (GKeyFile, ~/.config/matcom-guard/config.ini), lo que
+// permitía que sus umbrales de CPU/RAM divergieran silenciosamente de los
+// que el backend realmente usaba para disparar alertas.
 #include "gui_config_dialog.h"
 #include "gui_internal.h"
 #include "gui.h"
+#include "process_monitor.h"
 #include <gtk/gtk.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct {
-    gdouble cpu_threshold;
-    gdouble mem_threshold;
-    gint usb_scan_interval;
-    gint process_scan_interval;
-    gint port_scan_interval;
-    gboolean auto_scan_usb;
-    gboolean auto_scan_processes;
-    gboolean auto_scan_ports;
-    gboolean enable_sound_alerts;
-    gboolean enable_notifications;
-    gboolean log_to_file;
-    gint port_scan_start;
-    gint port_scan_end;
-    gchar *whitelist_processes;
-} AppConfig;
-
-static AppConfig config = {
-    .cpu_threshold = 70.0,
-    .mem_threshold = 50.0,
-    .usb_scan_interval = 30,
-    .process_scan_interval = 5,
-    .port_scan_interval = 300,
-    .auto_scan_usb = TRUE,
-    .auto_scan_processes = TRUE,
-    .auto_scan_ports = FALSE,
-    .enable_sound_alerts = TRUE,
-    .enable_notifications = TRUE,
-    .log_to_file = TRUE,
-    .port_scan_start = 1,
-    .port_scan_end = 1024,
-    .whitelist_processes = NULL
-};
-
-// A static initializer can't call g_strdup() (not a constant expression), but every
-// g_free(config.whitelist_processes) in this file assumes a heap-allocated string. Leaving the
-// field as a string literal here means the first Aplicar/Aceptar click on a fresh install (no
-// prior config.ini) frees a literal and crashes glibc with "free(): invalid pointer" -- reproduced
-// while manually testing this dialog. This one-time conversion keeps the same default text while
-// guaranteeing the pointer is always heap-allocated before any g_free() call can touch it.
-static void ensure_default_whitelist(void) {
-    if (!config.whitelist_processes) {
-        config.whitelist_processes = g_strdup("firefox,chrome,systemd,gnome-shell");
+// Construye "firefox,chrome,..." a partir del array white_list del Config
+// compartido, para mostrarlo en whitelist_entry. Devuelve memoria de GLib
+// que el llamador debe liberar con g_free().
+static gchar *whitelist_to_string(void) {
+    Config *cfg = get_config();
+    GString *joined = g_string_new(NULL);
+    for (int i = 0; i < cfg->num_white_processes; i++) {
+        if (i > 0) {
+            g_string_append_c(joined, ',');
+        }
+        g_string_append(joined, cfg->white_list[i]);
     }
+    return g_string_free(joined, FALSE);
+}
+
+// Reemplaza el white_list del Config compartido con los procesos de `text`
+// (separados por comas), liberando el array anterior. Usa malloc/strdup/free
+// simples -- no g_malloc/g_free -- porque process_monitor.c es dueño de este
+// array y lo libera con free() plano en su propia limpieza.
+static void whitelist_from_string(const gchar *text) {
+    Config *cfg = get_config();
+
+    for (int i = 0; i < cfg->num_white_processes; i++) {
+        free(cfg->white_list[i]);
+    }
+    free(cfg->white_list);
+    cfg->white_list = NULL;
+    cfg->num_white_processes = 0;
+
+    gchar *copy = g_strdup(text);
+    char *token = strtok(copy, ",");
+    while (token) {
+        char **temp_list = realloc(cfg->white_list, (cfg->num_white_processes + 1) * sizeof(char *));
+        if (!temp_list) {
+            break;
+        }
+        cfg->white_list = temp_list;
+        cfg->white_list[cfg->num_white_processes] = strdup(token);
+        if (cfg->white_list[cfg->num_white_processes]) {
+            cfg->num_white_processes++;
+        }
+        token = strtok(NULL, ",");
+    }
+    g_free(copy);
 }
 
 static GtkWidget *config_dialog = NULL;
@@ -69,99 +79,27 @@ static GtkWidget *port_start_spin = NULL;
 static GtkWidget *port_end_spin = NULL;
 static GtkWidget *whitelist_entry = NULL;
 
-static void save_config_to_file(void) {
-    gchar *config_path = g_build_filename(g_get_user_config_dir(), "matcom-guard", "config.ini", NULL);
-    gchar *config_dir = g_path_get_dirname(config_path);
-    g_mkdir_with_parents(config_dir, 0755);
-    g_free(config_dir);
-
-    GKeyFile *keyfile = g_key_file_new();
-    g_key_file_set_double(keyfile, "Thresholds", "cpu_threshold", config.cpu_threshold);
-    g_key_file_set_double(keyfile, "Thresholds", "mem_threshold", config.mem_threshold);
-    g_key_file_set_integer(keyfile, "Intervals", "usb_scan_interval", config.usb_scan_interval);
-    g_key_file_set_integer(keyfile, "Intervals", "process_scan_interval", config.process_scan_interval);
-    g_key_file_set_integer(keyfile, "Intervals", "port_scan_interval", config.port_scan_interval);
-    g_key_file_set_boolean(keyfile, "AutoScan", "usb", config.auto_scan_usb);
-    g_key_file_set_boolean(keyfile, "AutoScan", "processes", config.auto_scan_processes);
-    g_key_file_set_boolean(keyfile, "AutoScan", "ports", config.auto_scan_ports);
-    g_key_file_set_boolean(keyfile, "Alerts", "sound", config.enable_sound_alerts);
-    g_key_file_set_boolean(keyfile, "Alerts", "notifications", config.enable_notifications);
-    g_key_file_set_boolean(keyfile, "Alerts", "log_to_file", config.log_to_file);
-    g_key_file_set_integer(keyfile, "Ports", "scan_start", config.port_scan_start);
-    g_key_file_set_integer(keyfile, "Ports", "scan_end", config.port_scan_end);
-    g_key_file_set_string(keyfile, "Whitelist", "processes", config.whitelist_processes);
-
-    GError *error = NULL;
-    if (!g_key_file_save_to_file(keyfile, config_path, &error)) {
-        gui_add_log_entry("CONFIG", "ERROR", error->message);
-        g_error_free(error);
-    } else {
-        gui_add_log_entry("CONFIG", "INFO", "Configuracion guardada exitosamente");
-    }
-
-    g_key_file_free(keyfile);
-    g_free(config_path);
-}
-
-static void load_config_from_file(void) {
-    gchar *config_path = g_build_filename(g_get_user_config_dir(), "matcom-guard", "config.ini", NULL);
-    GKeyFile *keyfile = g_key_file_new();
-    GError *error = NULL;
-
-    if (!g_key_file_load_from_file(keyfile, config_path, G_KEY_FILE_NONE, &error)) {
-        g_error_free(error);
-        g_key_file_free(keyfile);
-        g_free(config_path);
-        return; // Sin archivo previo: se mantienen los valores por defecto.
-    }
-
-    config.cpu_threshold = g_key_file_get_double(keyfile, "Thresholds", "cpu_threshold", NULL);
-    config.mem_threshold = g_key_file_get_double(keyfile, "Thresholds", "mem_threshold", NULL);
-    config.usb_scan_interval = g_key_file_get_integer(keyfile, "Intervals", "usb_scan_interval", NULL);
-    config.process_scan_interval = g_key_file_get_integer(keyfile, "Intervals", "process_scan_interval", NULL);
-    config.port_scan_interval = g_key_file_get_integer(keyfile, "Intervals", "port_scan_interval", NULL);
-    config.auto_scan_usb = g_key_file_get_boolean(keyfile, "AutoScan", "usb", NULL);
-    config.auto_scan_processes = g_key_file_get_boolean(keyfile, "AutoScan", "processes", NULL);
-    config.auto_scan_ports = g_key_file_get_boolean(keyfile, "AutoScan", "ports", NULL);
-    config.enable_sound_alerts = g_key_file_get_boolean(keyfile, "Alerts", "sound", NULL);
-    config.enable_notifications = g_key_file_get_boolean(keyfile, "Alerts", "notifications", NULL);
-    config.log_to_file = g_key_file_get_boolean(keyfile, "Alerts", "log_to_file", NULL);
-    config.port_scan_start = g_key_file_get_integer(keyfile, "Ports", "scan_start", NULL);
-    config.port_scan_end = g_key_file_get_integer(keyfile, "Ports", "scan_end", NULL);
-
-    gchar *whitelist = g_key_file_get_string(keyfile, "Whitelist", "processes", NULL);
-    if (whitelist) {
-        g_free(config.whitelist_processes);
-        config.whitelist_processes = whitelist;
-    }
-
-    g_key_file_free(keyfile);
-    g_free(config_path);
-    gui_add_log_entry("CONFIG", "INFO", "Configuracion cargada desde archivo");
-}
-
 static void on_config_apply_clicked(GtkButton *button, gpointer data) {
     (void)button; (void)data;
 
-    config.cpu_threshold = gtk_spin_button_get_value(GTK_SPIN_BUTTON(cpu_threshold_spin));
-    config.mem_threshold = gtk_spin_button_get_value(GTK_SPIN_BUTTON(mem_threshold_spin));
-    config.usb_scan_interval = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(usb_interval_spin));
-    config.process_scan_interval = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(process_interval_spin));
-    config.port_scan_interval = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(port_interval_spin));
-    config.auto_scan_usb = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(auto_usb_check));
-    config.auto_scan_processes = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(auto_process_check));
-    config.auto_scan_ports = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(auto_port_check));
-    config.enable_sound_alerts = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(sound_alerts_check));
-    config.enable_notifications = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(notifications_check));
-    config.log_to_file = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(log_file_check));
-    config.port_scan_start = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(port_start_spin));
-    config.port_scan_end = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(port_end_spin));
+    Config *cfg = get_config();
+    cfg->max_cpu_usage = gtk_spin_button_get_value(GTK_SPIN_BUTTON(cpu_threshold_spin));
+    cfg->max_ram_usage = gtk_spin_button_get_value(GTK_SPIN_BUTTON(mem_threshold_spin));
+    cfg->usb_scan_interval = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(usb_interval_spin));
+    cfg->process_scan_interval = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(process_interval_spin));
+    cfg->port_scan_interval = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(port_interval_spin));
+    cfg->auto_scan_usb = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(auto_usb_check));
+    cfg->auto_scan_processes = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(auto_process_check));
+    cfg->auto_scan_ports = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(auto_port_check));
+    cfg->enable_sound_alerts = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(sound_alerts_check));
+    cfg->enable_notifications = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(notifications_check));
+    cfg->log_to_file = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(log_file_check));
+    cfg->port_scan_start = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(port_start_spin));
+    cfg->port_scan_end = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(port_end_spin));
 
-    const gchar *whitelist = gtk_entry_get_text(GTK_ENTRY(whitelist_entry));
-    g_free(config.whitelist_processes);
-    config.whitelist_processes = g_strdup(whitelist);
+    whitelist_from_string(gtk_entry_get_text(GTK_ENTRY(whitelist_entry)));
 
-    save_config_to_file();
+    save_config();
     gui_add_log_entry("CONFIG", "INFO", "Configuracion aplicada exitosamente");
 }
 
@@ -207,14 +145,16 @@ static GtkWidget *create_thresholds_page(void) {
 
     gtk_grid_attach(GTK_GRID(grid), page_title("Umbrales de Alerta"), 0, 0, 2, 1);
 
+    Config *cfg = get_config();
+
     gtk_grid_attach(GTK_GRID(grid), gtk_label_new("Umbral de CPU (%):"), 0, 1, 1, 1);
     cpu_threshold_spin = gtk_spin_button_new_with_range(10.0, 100.0, 5.0);
-    gtk_spin_button_set_value(GTK_SPIN_BUTTON(cpu_threshold_spin), config.cpu_threshold);
+    gtk_spin_button_set_value(GTK_SPIN_BUTTON(cpu_threshold_spin), cfg->max_cpu_usage);
     gtk_grid_attach(GTK_GRID(grid), cpu_threshold_spin, 1, 1, 1, 1);
 
     gtk_grid_attach(GTK_GRID(grid), gtk_label_new("Umbral de Memoria (%):"), 0, 2, 1, 1);
     mem_threshold_spin = gtk_spin_button_new_with_range(10.0, 100.0, 5.0);
-    gtk_spin_button_set_value(GTK_SPIN_BUTTON(mem_threshold_spin), config.mem_threshold);
+    gtk_spin_button_set_value(GTK_SPIN_BUTTON(mem_threshold_spin), cfg->max_ram_usage);
     gtk_grid_attach(GTK_GRID(grid), mem_threshold_spin, 1, 2, 1, 1);
 
     return grid;
@@ -231,28 +171,30 @@ static GtkWidget *create_intervals_page(void) {
     gtk_grid_attach(GTK_GRID(grid), gtk_label_new("Intervalo (seg)"), 1, 1, 1, 1);
     gtk_grid_attach(GTK_GRID(grid), gtk_label_new("Activar"), 2, 1, 1, 1);
 
+    Config *cfg = get_config();
+
     gtk_grid_attach(GTK_GRID(grid), gtk_label_new("Dispositivos USB:"), 0, 2, 1, 1);
     usb_interval_spin = gtk_spin_button_new_with_range(5.0, 3600.0, 5.0);
-    gtk_spin_button_set_value(GTK_SPIN_BUTTON(usb_interval_spin), config.usb_scan_interval);
+    gtk_spin_button_set_value(GTK_SPIN_BUTTON(usb_interval_spin), cfg->usb_scan_interval);
     gtk_grid_attach(GTK_GRID(grid), usb_interval_spin, 1, 2, 1, 1);
     auto_usb_check = gtk_check_button_new();
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(auto_usb_check), config.auto_scan_usb);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(auto_usb_check), cfg->auto_scan_usb);
     gtk_grid_attach(GTK_GRID(grid), auto_usb_check, 2, 2, 1, 1);
 
     gtk_grid_attach(GTK_GRID(grid), gtk_label_new("Procesos:"), 0, 3, 1, 1);
     process_interval_spin = gtk_spin_button_new_with_range(1.0, 300.0, 1.0);
-    gtk_spin_button_set_value(GTK_SPIN_BUTTON(process_interval_spin), config.process_scan_interval);
+    gtk_spin_button_set_value(GTK_SPIN_BUTTON(process_interval_spin), cfg->process_scan_interval);
     gtk_grid_attach(GTK_GRID(grid), process_interval_spin, 1, 3, 1, 1);
     auto_process_check = gtk_check_button_new();
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(auto_process_check), config.auto_scan_processes);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(auto_process_check), cfg->auto_scan_processes);
     gtk_grid_attach(GTK_GRID(grid), auto_process_check, 2, 3, 1, 1);
 
     gtk_grid_attach(GTK_GRID(grid), gtk_label_new("Puertos de Red:"), 0, 4, 1, 1);
     port_interval_spin = gtk_spin_button_new_with_range(60.0, 7200.0, 60.0);
-    gtk_spin_button_set_value(GTK_SPIN_BUTTON(port_interval_spin), config.port_scan_interval);
+    gtk_spin_button_set_value(GTK_SPIN_BUTTON(port_interval_spin), cfg->port_scan_interval);
     gtk_grid_attach(GTK_GRID(grid), port_interval_spin, 1, 4, 1, 1);
     auto_port_check = gtk_check_button_new();
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(auto_port_check), config.auto_scan_ports);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(auto_port_check), cfg->auto_scan_ports);
     gtk_grid_attach(GTK_GRID(grid), auto_port_check, 2, 4, 1, 1);
 
     return grid;
@@ -264,16 +206,18 @@ static GtkWidget *create_alerts_page(void) {
 
     gtk_box_pack_start(GTK_BOX(vbox), page_title("Configuracion de Alertas"), FALSE, FALSE, 0);
 
+    Config *cfg = get_config();
+
     sound_alerts_check = gtk_check_button_new_with_label("Activar alertas sonoras");
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(sound_alerts_check), config.enable_sound_alerts);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(sound_alerts_check), cfg->enable_sound_alerts);
     gtk_box_pack_start(GTK_BOX(vbox), sound_alerts_check, FALSE, FALSE, 0);
 
     notifications_check = gtk_check_button_new_with_label("Mostrar notificaciones del sistema");
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(notifications_check), config.enable_notifications);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(notifications_check), cfg->enable_notifications);
     gtk_box_pack_start(GTK_BOX(vbox), notifications_check, FALSE, FALSE, 0);
 
     log_file_check = gtk_check_button_new_with_label("Guardar logs en archivo");
-    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(log_file_check), config.log_to_file);
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(log_file_check), cfg->log_to_file);
     gtk_box_pack_start(GTK_BOX(vbox), log_file_check, FALSE, FALSE, 0);
 
     gtk_box_pack_start(GTK_BOX(vbox), gtk_separator_new(GTK_ORIENTATION_HORIZONTAL), FALSE, FALSE, 10);
@@ -282,11 +226,11 @@ static GtkWidget *create_alerts_page(void) {
     GtkWidget *ports_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
     gtk_box_pack_start(GTK_BOX(ports_box), gtk_label_new("Desde:"), FALSE, FALSE, 0);
     port_start_spin = gtk_spin_button_new_with_range(1.0, 65535.0, 1.0);
-    gtk_spin_button_set_value(GTK_SPIN_BUTTON(port_start_spin), config.port_scan_start);
+    gtk_spin_button_set_value(GTK_SPIN_BUTTON(port_start_spin), cfg->port_scan_start);
     gtk_box_pack_start(GTK_BOX(ports_box), port_start_spin, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(ports_box), gtk_label_new("Hasta:"), FALSE, FALSE, 0);
     port_end_spin = gtk_spin_button_new_with_range(1.0, 65535.0, 1.0);
-    gtk_spin_button_set_value(GTK_SPIN_BUTTON(port_end_spin), config.port_scan_end);
+    gtk_spin_button_set_value(GTK_SPIN_BUTTON(port_end_spin), cfg->port_scan_end);
     gtk_box_pack_start(GTK_BOX(ports_box), port_end_spin, FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(vbox), ports_box, FALSE, FALSE, 0);
 
@@ -306,7 +250,9 @@ static GtkWidget *create_whitelist_page(void) {
     gtk_box_pack_start(GTK_BOX(vbox), desc, FALSE, FALSE, 0);
 
     whitelist_entry = gtk_entry_new();
-    gtk_entry_set_text(GTK_ENTRY(whitelist_entry), config.whitelist_processes);
+    gchar *whitelist_text = whitelist_to_string();
+    gtk_entry_set_text(GTK_ENTRY(whitelist_entry), whitelist_text);
+    g_free(whitelist_text);
     gtk_box_pack_start(GTK_BOX(vbox), whitelist_entry, FALSE, FALSE, 0);
 
     GtkWidget *common_list = gtk_label_new(
@@ -324,8 +270,9 @@ static GtkWidget *create_whitelist_page(void) {
 }
 
 void show_config_dialog(GtkWindow *parent) {
-    ensure_default_whitelist();
-    load_config_from_file();
+    // El Config compartido ya esta cargado desde matcomguard.conf (una vez,
+    // al arrancar la app via gui_process_panel_create() -> load_config()) --
+    // este dialogo solo lo lee/escribe, no necesita recargarlo del disco.
 
     config_dialog = gtk_dialog_new_with_buttons("Configuracion de MatCom Guard", parent,
         GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
@@ -362,5 +309,5 @@ void show_config_dialog(GtkWindow *parent) {
     config_dialog = NULL;
 }
 
-gdouble get_cpu_threshold(void) { return config.cpu_threshold; }
-gdouble get_mem_threshold(void) { return config.mem_threshold; }
+gdouble get_cpu_threshold(void) { return get_config()->max_cpu_usage; }
+gdouble get_mem_threshold(void) { return get_config()->max_ram_usage; }

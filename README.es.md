@@ -54,7 +54,7 @@ make check-deps
 - 🔌 **Escáner Puertos**: Escaneo rápido (1-1024) y completo (1-65535)
 - 📊 **Dashboard**: Vista consolidada del estado del sistema
 - 📄 **Exportar PDF**: Reportes profesionales con un clic
-- ⚙️ **Configuración**: `matcomguard.conf` para el backend, más un diálogo "Configuración" dentro de la app
+- ⚙️ **Configuración**: un solo archivo compartido, editable desde el diálogo "Configuración" dentro de la app
 
 ## 📸 Capturas de Pantalla
 
@@ -284,7 +284,6 @@ sudo ./matcom-guard
 ```
 MatCom-Guard-SO-Project/
 ├── Makefile                       # Sistema de compilación
-├── matcomguard.conf                 # Config del backend (umbrales, whitelist)
 ├── README.md / README.es.md       # Esta documentación
 ├── include/                       # Headers del proyecto
 │   ├── device_monitor.h           # Monitor de dispositivos USB
@@ -393,26 +392,38 @@ Actividad Sospechosa:
 
 ### **⚙️ Configuración Flexible**
 
-Hoy existen dos superficies de configuración independientes:
+Un único archivo de configuración, `~/.config/matcom-guard/matcomguard.conf`,
+se lee una vez al iniciar y lo comparten el backend y el diálogo
+"Configuración" de la GUI (barra de acciones superior) -- ambos leen y
+escriben exactamente el mismo struct en memoria, asi que no hay riesgo de
+que un umbral quede desincronizado entre los dos:
 
-**Config del backend** — `matcomguard.conf` (raíz del proyecto), leído por
-`process_monitor.c` al iniciar:
 ```properties
-# Archivo: matcomguard.conf
-UMBRAL_CPU=70.0          # Umbral de CPU para el propio bucle de alertas del backend (%)
-UMBRAL_RAM=50.0          # Umbral de memoria para el propio bucle de alertas del backend (%)
-INTERVALO=5              # Intervalo de monitoreo (segundos)
-DURACION_ALERTA=10       # Duración de alertas (segundos)
-WHITELIST=systemd,kthreadd,ksoftirqd,migration,rcu_gp,rcu_par_gp,watchdog,stress,yes
+# Archivo: ~/.config/matcom-guard/matcomguard.conf
+UMBRAL_CPU=70.0                    # Umbral de CPU -- controla el bucle de alertas
+                                    # real del backend Y el coloreado del panel de Procesos
+UMBRAL_RAM=50.0                    # Lo mismo, para memoria
+INTERVALO=5                        # Intervalo propio del backend para su bucle de monitoreo (segundos)
+DURACION_ALERTA=10                 # Duración de alertas (segundos)
+INTERVALO_ESCANEO_USB=30           # Debajo: editables desde las otras pestañas
+INTERVALO_ESCANEO_PROCESOS=5       # del diálogo, se guardan, pero ningún escaneo
+INTERVALO_ESCANEO_PUERTOS=300      # las lee todavía -- ver las pestañas del diálogo
+AUTO_ESCANEO_USB=1
+AUTO_ESCANEO_PROCESOS=1
+AUTO_ESCANEO_PUERTOS=0
+ALERTAS_SONORAS=1
+NOTIFICACIONES=1
+GUARDAR_LOGS=1
+RANGO_PUERTOS_INICIO=1
+RANGO_PUERTOS_FIN=1024
+WHITELIST=systemd,kthreadd,ksoftirqd,migration,rcu_gp,rcu_par_gp,watchdog,stress
 ```
 
-**Config de la GUI** — el diálogo "Configuración" (barra de acciones superior),
-persistido en `~/.config/matcom-guard/config.ini`. Su pestaña **Umbrales**
-(CPU/memoria) controla directamente el coloreado de filas del panel de
-Procesos. Las demás pestañas (intervalos de escaneo, auto-escaneo, sonido/
-notificaciones, rango de puertos, lista blanca) se guardan y son editables,
-pero nada las lee todavía para afectar el comportamiento real de los
-escaneos -- aún no están conectadas al backend.
+Solo `UMBRAL_CPU`/`UMBRAL_RAM`/`WHITELIST` afectan hoy el comportamiento real
+de los escaneos de punta a punta. El resto de los ajustes del diálogo
+(intervalos de escaneo, auto-escaneo, sonido/notificaciones, rango de
+puertos) se guardan y son editables, pero aún no están conectados al
+comportamiento de los escaneos.
 
 ### **🛡️ Seguridad Thread-Safe**
 

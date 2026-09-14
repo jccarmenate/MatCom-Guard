@@ -6,8 +6,6 @@
 #include <sys/types.h>
 #include "progress.h"
 
-#define CONFIG_PATH "./matcomguard.conf"
-
 // ===== ESTRUCTURAS PÚBLICAS =====
 
 typedef struct {
@@ -30,6 +28,22 @@ typedef struct {
     int alert_duration;
     char **white_list;
     int num_white_processes;
+
+    // Ajustes editables desde el dialogo de configuracion de la GUI. Se
+    // persisten junto al resto en matcomguard.conf, pero (fuera de los
+    // umbrales y la whitelist de arriba) todavia no los lee ningun escaneo
+    // -- ver docs/README para el alcance actual.
+    int usb_scan_interval;
+    int process_scan_interval;
+    int port_scan_interval;
+    int auto_scan_usb;
+    int auto_scan_processes;
+    int auto_scan_ports;
+    int enable_sound_alerts;
+    int enable_notifications;
+    int log_to_file;
+    int port_scan_start;
+    int port_scan_end;
 } Config;
 
 // ===== CALLBACKS PARA EVENTOS =====
