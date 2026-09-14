@@ -154,6 +154,13 @@ GtkWidget *gui_shell_get_action_bar(void) {
     return action_bar_container;
 }
 
+void gui_shell_set_active_page(int page_index) {
+    if (page_index < 0 || page_index >= GUI_SHELL_PAGE_COUNT || !rail_buttons[page_index]) {
+        return;
+    }
+    gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(rail_buttons[page_index]), TRUE);
+}
+
 void gui_shell_set_status_badge(const char *text, gboolean is_healthy) {
     if (!status_badge || !text) {
         return;

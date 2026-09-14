@@ -42,4 +42,15 @@ GtkWidget *gui_shell_get_action_bar(void);
  */
 void gui_shell_set_status_badge(const char *text, gboolean is_healthy);
 
+/**
+ * Cambia la página activa del shell a `page_index` (0=Dashboard, 1=USB,
+ * 2=Procesos, 3=Puertos, 4=Registros), como si el usuario hubiera hecho
+ * clic en el botón correspondiente del riel de iconos. Pensada para que
+ * el llamador pueda saltar a una sección concreta desde fuera del riel
+ * (por ejemplo, el menú "Escanear" salta a la sección que va a escanear).
+ * No-op si page_index está fuera de [0, 4] o si gui_shell_create()
+ * todavía no fue llamado.
+ */
+void gui_shell_set_active_page(int page_index);
+
 #endif // GUI_SHELL_H

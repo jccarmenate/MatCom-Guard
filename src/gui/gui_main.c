@@ -67,6 +67,9 @@ static void on_scan_all_clicked(GtkMenuItem *item __attribute__((unused)), gpoin
     gui_add_log_entry("SCANNER", "INFO", "Iniciando escaneo completo del sistema");
     gui_set_scanning_status(TRUE);
 
+    // Cambiar a la pagina de logs para ver el progreso
+    gui_shell_set_active_page(4);
+
     // Ejecutar todos los escaneos
     if (usb_callback) usb_callback();
     if (processes_callback) processes_callback();
@@ -84,6 +87,7 @@ static gboolean gui_set_scanning_status_timeout(gpointer user_data) {
 }
 
 static void on_scan_usb_menu_clicked(GtkMenuItem *item __attribute__((unused)), gpointer data __attribute__((unused))) {
+    gui_shell_set_active_page(1);
     if (usb_callback) {
         gui_add_log_entry("USB_SCANNER", "INFO", "Escaneo manual de USB iniciado desde menu");
         usb_callback();
@@ -91,6 +95,7 @@ static void on_scan_usb_menu_clicked(GtkMenuItem *item __attribute__((unused)), 
 }
 
 static void on_scan_processes_menu_clicked(GtkMenuItem *item __attribute__((unused)), gpointer data __attribute__((unused))) {
+    gui_shell_set_active_page(2);
     if (processes_callback) {
         gui_add_log_entry("PROCESS_SCANNER", "INFO", "Escaneo manual de procesos iniciado desde menu");
         processes_callback();
@@ -98,6 +103,7 @@ static void on_scan_processes_menu_clicked(GtkMenuItem *item __attribute__((unus
 }
 
 static void on_scan_ports_menu_clicked(GtkMenuItem *item __attribute__((unused)), gpointer data __attribute__((unused))) {
+    gui_shell_set_active_page(3);
     if (ports_callback) {
         gui_add_log_entry("PORT_SCANNER", "INFO", "Escaneo manual de puertos iniciado desde menu");
         ports_callback();
