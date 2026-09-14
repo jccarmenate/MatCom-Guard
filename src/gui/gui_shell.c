@@ -8,6 +8,8 @@
 static GtkWidget *rail_buttons[GUI_SHELL_PAGE_COUNT];
 static GtkWidget *page_containers[GUI_SHELL_PAGE_COUNT];
 static GtkWidget *content_stack = NULL;
+static GtkWidget *action_bar_container = NULL;
+static GtkWidget *status_badge = NULL;
 
 static const char *page_names[GUI_SHELL_PAGE_COUNT] = {
     "page0", "page1", "page2", "page3", "page4"
@@ -56,9 +58,14 @@ static GtkWidget *create_status_badge_bar(void) {
     gtk_widget_set_halign(title, GTK_ALIGN_START);
     gtk_box_pack_start(GTK_BOX(bar), title, TRUE, TRUE, 0);
 
-    GtkWidget *badge = gtk_label_new("\xE2\x97\x8F SISTEMA SEGURO");
-    gtk_style_context_add_class(gtk_widget_get_style_context(badge), "nw-badge");
-    gtk_box_pack_end(GTK_BOX(bar), badge, FALSE, FALSE, 0);
+    // Vacío: el llamador agrega aquí sus propios botones de acción
+    // (Escanear/Pausar/Configuración/Exportar) via gui_shell_get_action_bar().
+    action_bar_container = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+    gtk_box_pack_start(GTK_BOX(bar), action_bar_container, FALSE, FALSE, 0);
+
+    status_badge = gtk_label_new("\xE2\x97\x8F SISTEMA SEGURO");
+    gtk_style_context_add_class(gtk_widget_get_style_context(status_badge), "nw-badge");
+    gtk_box_pack_end(GTK_BOX(bar), status_badge, FALSE, FALSE, 0);
 
     return bar;
 }
@@ -141,4 +148,27 @@ GtkWidget *gui_shell_get_page_container(int page_index) {
         return NULL;
     }
     return page_containers[page_index];
+}
+
+GtkWidget *gui_shell_get_action_bar(void) {
+    return action_bar_container;
+}
+
+void gui_shell_set_status_badge(const char *text, gboolean is_healthy) {
+    if (!status_badge || !text) {
+        return;
+    }
+
+    char badge_text[160];
+    snprintf(badge_text, sizeof(badge_text), "\xE2\x97\x8F %s", text);
+    gtk_label_set_text(GTK_LABEL(status_badge), badge_text);
+
+    GtkStyleContext *ctx = gtk_widget_get_style_context(status_badge);
+    if (is_healthy) {
+        gtk_style_context_remove_class(ctx, "nw-badge-critical");
+        gtk_style_context_add_class(ctx, "nw-badge");
+    } else {
+        gtk_style_context_remove_class(ctx, "nw-badge");
+        gtk_style_context_add_class(ctx, "nw-badge-critical");
+    }
 }

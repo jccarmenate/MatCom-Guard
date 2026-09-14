@@ -22,8 +22,6 @@ typedef struct {
 static GtkWidget *process_list_box = NULL;
 static GtkWidget *process_dial = NULL;
 static GtkWidget *process_kill_button = NULL;
-static GtkWidget *process_cpu_threshold_spin = NULL;
-static GtkWidget *process_mem_threshold_spin = NULL;
 
 static ProcessCallbacks process_backend_callbacks;
 static GuiThreadBridgeTarget process_progress_target;
@@ -72,8 +70,8 @@ static void on_process_row_selected(GtkListBox *box, GtkListBoxRow *row, gpointe
 void gui_update_process(GUIProcess *process) {
     if (!process_list_box || !process) return;
 
-    gdouble cpu_threshold = gtk_spin_button_get_value(GTK_SPIN_BUTTON(process_cpu_threshold_spin));
-    gdouble mem_threshold = gtk_spin_button_get_value(GTK_SPIN_BUTTON(process_mem_threshold_spin));
+    gdouble cpu_threshold = get_cpu_threshold();
+    gdouble mem_threshold = get_mem_threshold();
 
     const char *status;
     const char *level;
@@ -313,14 +311,6 @@ static void on_kill_process_clicked(GtkButton *button, gpointer data) {
     gtk_widget_set_sensitive(process_kill_button, FALSE);
 }
 
-static void on_threshold_changed(GtkSpinButton *spin, gpointer data) {
-    const char *type = (const char *)data;
-    gdouble value = gtk_spin_button_get_value(spin);
-    char log_msg[256];
-    snprintf(log_msg, sizeof(log_msg), "Umbral de %s (panel) cambiado a %.0f%%", type, value);
-    gui_add_log_entry("CONFIG", "INFO", log_msg);
-}
-
 // ============================================================================
 // CICLO DE VIDA DEL PANEL
 // ============================================================================
@@ -355,21 +345,6 @@ GtkWidget *gui_process_panel_create(void) {
     process_progress_target.handler = on_process_status_update;
     process_progress_target.ui_user_data = process_dial;
     process_progress_target.watch = G_OBJECT(process_dial);
-
-    GtkWidget *threshold_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
-    gtk_box_pack_start(GTK_BOX(threshold_row), gtk_label_new("Umbral CPU (%):"), FALSE, FALSE, 0);
-    process_cpu_threshold_spin = gtk_spin_button_new_with_range(10.0, 100.0, 5.0);
-    gtk_spin_button_set_value(GTK_SPIN_BUTTON(process_cpu_threshold_spin), 70.0);
-    g_signal_connect(process_cpu_threshold_spin, "value-changed", G_CALLBACK(on_threshold_changed), "CPU");
-    gtk_box_pack_start(GTK_BOX(threshold_row), process_cpu_threshold_spin, FALSE, FALSE, 0);
-
-    gtk_box_pack_start(GTK_BOX(threshold_row), gtk_label_new("Umbral Memoria (%):"), FALSE, FALSE, 0);
-    process_mem_threshold_spin = gtk_spin_button_new_with_range(10.0, 100.0, 5.0);
-    gtk_spin_button_set_value(GTK_SPIN_BUTTON(process_mem_threshold_spin), 50.0);
-    g_signal_connect(process_mem_threshold_spin, "value-changed", G_CALLBACK(on_threshold_changed), "Memoria");
-    gtk_box_pack_start(GTK_BOX(threshold_row), process_mem_threshold_spin, FALSE, FALSE, 0);
-
-    gtk_box_pack_start(GTK_BOX(panel), threshold_row, FALSE, FALSE, 0);
 
     GtkWidget *scrolled = gtk_scrolled_window_new(NULL, NULL);
     gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scrolled), GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);

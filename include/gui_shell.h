@@ -26,4 +26,20 @@ GtkWidget *gui_shell_create(void);
  */
 GtkWidget *gui_shell_get_page_container(int page_index);
 
+/**
+ * Contenedor vacío en la barra superior del shell, entre el título y la
+ * insignia de estado, para que el llamador agregue sus propios botones de
+ * acción (antes vivían en la barra de título nativa de GTK, retirada al
+ * consolidar toda la interfaz en el shell Night Watch). NULL si
+ * gui_shell_create() todavía no fue llamado.
+ */
+GtkWidget *gui_shell_get_action_bar(void);
+
+/**
+ * Actualiza el texto y color de la insignia de estado ("● SISTEMA SEGURO"
+ * por defecto) en la barra superior del shell. is_healthy determina el
+ * color (verde/rojo). No-op si gui_shell_create() todavía no fue llamado.
+ */
+void gui_shell_set_status_badge(const char *text, gboolean is_healthy);
+
 #endif // GUI_SHELL_H

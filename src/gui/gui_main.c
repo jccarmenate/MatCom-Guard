@@ -16,9 +16,6 @@
 
 GtkWidget *main_window = NULL;
 GtkWidget *main_container = NULL;
-GtkWidget *header_bar = NULL;
-GtkWidget *status_bar = NULL;
-GtkWidget *notebook = NULL;
 
 // Variables de callbacks del backend
 ScanUSBCallback usb_callback = NULL;
@@ -166,66 +163,71 @@ static void on_export_clicked(GtkButton *button __attribute__((unused)), gpointe
     gtk_widget_destroy(dialog);
 }
 
-static GtkWidget* create_header_bar() {
-    GtkWidget *header = gtk_header_bar_new();
-    gtk_header_bar_set_show_close_button(GTK_HEADER_BAR(header), TRUE);
-    gtk_header_bar_set_title(GTK_HEADER_BAR(header), "MatCom Guard");
-    gtk_header_bar_set_subtitle(GTK_HEADER_BAR(header), "Sistema de Protección Digital");
-    
+// Empaqueta los botones de acción (antes en el GtkHeaderBar nativo) dentro
+// del contenedor vacío que expone gui_shell_get_action_bar(), en la barra
+// superior del shell Night Watch. Debe llamarse después de gui_shell_create().
+static void create_action_bar_buttons(void) {
+    GtkWidget *action_bar = gui_shell_get_action_bar();
+    if (action_bar == NULL) {
+        return;
+    }
+
     // Menú de escaneo con opciones
     GtkWidget *scan_menu_button = gtk_menu_button_new();
     gtk_button_set_label(GTK_BUTTON(scan_menu_button), "🛡️ Escanear");
     gtk_widget_set_tooltip_text(scan_menu_button, "Opciones de escaneo de seguridad");
-    
+    gtk_style_context_add_class(gtk_widget_get_style_context(scan_menu_button), "nw-button-primary");
+
     // Crear el menú
     GtkWidget *scan_menu = gtk_menu_new();
-    
+
     // Opción: Escaneo completo
     GtkWidget *scan_all_item = gtk_menu_item_new_with_label("🛡️ Escaneo Completo");
     g_signal_connect(scan_all_item, "activate", G_CALLBACK(on_scan_all_clicked), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(scan_menu), scan_all_item);
-    
+
     // Separador
     gtk_menu_shell_append(GTK_MENU_SHELL(scan_menu), gtk_separator_menu_item_new());
-    
+
     // Opciones individuales
     GtkWidget *scan_usb_item = gtk_menu_item_new_with_label("💾 Escanear Dispositivos USB");
     g_signal_connect(scan_usb_item, "activate", G_CALLBACK(on_scan_usb_menu_clicked), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(scan_menu), scan_usb_item);
-    
+
     GtkWidget *scan_proc_item = gtk_menu_item_new_with_label("⚡ Escanear Procesos");
     g_signal_connect(scan_proc_item, "activate", G_CALLBACK(on_scan_processes_menu_clicked), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(scan_menu), scan_proc_item);
-    
+
     GtkWidget *scan_ports_item = gtk_menu_item_new_with_label("🔌 Escanear Puertos");
     g_signal_connect(scan_ports_item, "activate", G_CALLBACK(on_scan_ports_menu_clicked), NULL);
     gtk_menu_shell_append(GTK_MENU_SHELL(scan_menu), scan_ports_item);
-    
+
     gtk_widget_show_all(scan_menu);
     gtk_menu_button_set_popup(GTK_MENU_BUTTON(scan_menu_button), scan_menu);
-    gtk_header_bar_pack_start(GTK_HEADER_BAR(header), scan_menu_button);
-    
+    gtk_box_pack_start(GTK_BOX(action_bar), scan_menu_button, FALSE, FALSE, 0);
+
     // Botón de pausa/reanudar monitoreo
     GtkWidget *monitor_toggle_btn = gtk_toggle_button_new();
     gtk_button_set_label(GTK_BUTTON(monitor_toggle_btn), "⏸️ Pausar");
     gtk_widget_set_tooltip_text(monitor_toggle_btn, "Pausar/Reanudar monitoreo automático");
+    gtk_style_context_add_class(gtk_widget_get_style_context(monitor_toggle_btn), "nw-button-secondary");
     gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(monitor_toggle_btn), TRUE);
     g_signal_connect(monitor_toggle_btn, "toggled", G_CALLBACK(on_monitor_toggle_clicked), NULL);
-    gtk_header_bar_pack_start(GTK_HEADER_BAR(header), monitor_toggle_btn);
-    
+    gtk_box_pack_start(GTK_BOX(action_bar), monitor_toggle_btn, FALSE, FALSE, 0);
+
     // Botón de configuración
     GtkWidget *config_btn = gtk_button_new_with_label("⚙️ Configuración");
     gtk_widget_set_tooltip_text(config_btn, "Ajustar configuración del sistema");
+    gtk_style_context_add_class(gtk_widget_get_style_context(config_btn), "nw-button-secondary");
     g_signal_connect(config_btn, "clicked", G_CALLBACK(on_config_clicked), NULL);
-    gtk_header_bar_pack_end(GTK_HEADER_BAR(header), config_btn);
-    
+    gtk_box_pack_start(GTK_BOX(action_bar), config_btn, FALSE, FALSE, 0);
+
     // Botón de exportar
     GtkWidget *export_btn = gtk_button_new_with_label("📄 Exportar");
     gtk_widget_set_tooltip_text(export_btn, "Generar reporte de seguridad");
+    gtk_style_context_add_class(gtk_widget_get_style_context(export_btn), "nw-button-secondary");
     g_signal_connect(export_btn, "clicked", G_CALLBACK(on_export_clicked), NULL);
-    gtk_header_bar_pack_end(GTK_HEADER_BAR(header), export_btn);
-    
-    return header;
+    gtk_box_pack_start(GTK_BOX(action_bar), export_btn, FALSE, FALSE, 0);
 }
 
 static int initialize_complete_backend_system(void) {
@@ -307,9 +309,6 @@ void init_gui(int argc, char **argv) {
 
     g_signal_connect(main_window, "destroy", G_CALLBACK(on_window_destroy), NULL);
 
-    header_bar = create_header_bar();
-    gtk_window_set_titlebar(GTK_WINDOW(main_window), header_bar);
-
     main_container = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     if (main_container == NULL) {
         printf("ERROR: Falló la creación de main_container!\n");
@@ -319,6 +318,7 @@ void init_gui(int argc, char **argv) {
 
     GtkWidget *shell = gui_shell_create();
     gtk_box_pack_start(GTK_BOX(main_container), shell, TRUE, TRUE, 0);
+    create_action_bar_buttons();
 
     GtkWidget *dashboard_page = gui_shell_get_page_container(0);
     if (dashboard_page != NULL) {
@@ -373,9 +373,6 @@ void init_gui(int argc, char **argv) {
         gtk_box_pack_start(GTK_BOX(logs_page), gui_logs_panel_create(), TRUE, TRUE, 0);
     }
 
-    status_bar = create_status_bar();
-    gtk_box_pack_end(GTK_BOX(main_container), status_bar, FALSE, FALSE, 0);
-    
     // ========================================================================
     // INTEGRACIÓN COMPLETA DEL SISTEMA BACKEND
     // ========================================================================
