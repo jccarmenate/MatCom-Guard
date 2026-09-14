@@ -61,11 +61,6 @@ static void on_window_destroy(GtkWidget *widget __attribute__((unused)), gpointe
 static void on_scan_all_clicked(GtkMenuItem *item __attribute__((unused)), gpointer data __attribute__((unused))) {
     gui_add_log_entry("SCANNER", "INFO", "Iniciando escaneo completo del sistema");
     gui_set_scanning_status(TRUE);
-    
-    // Cambiar a la pestaña de logs para ver el progreso
-    if (notebook != NULL) {
-        gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook), 4);
-    }
 
     // Ejecutar todos los escaneos
     if (usb_callback) usb_callback();
@@ -84,40 +79,22 @@ static gboolean gui_set_scanning_status_timeout(gpointer user_data) {
 }
 
 static void on_scan_usb_menu_clicked(GtkMenuItem *item __attribute__((unused)), gpointer data __attribute__((unused))) {
-    // Cambiar a la pestaña USB
-    if (notebook != NULL) {
-        gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook), 1);
-    }
-
-    // Ejecutar escaneo
     if (usb_callback) {
-        gui_add_log_entry("USB_SCANNER", "INFO", "Escaneo manual de USB iniciado desde menú");
+        gui_add_log_entry("USB_SCANNER", "INFO", "Escaneo manual de USB iniciado desde menu");
         usb_callback();
     }
 }
 
 static void on_scan_processes_menu_clicked(GtkMenuItem *item __attribute__((unused)), gpointer data __attribute__((unused))) {
-    // Cambiar a la pestaña de procesos
-    if (notebook != NULL) {
-        gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook), 2);
-    }
-
-    // Ejecutar escaneo
     if (processes_callback) {
-        gui_add_log_entry("PROCESS_SCANNER", "INFO", "Escaneo manual de procesos iniciado desde menú");
+        gui_add_log_entry("PROCESS_SCANNER", "INFO", "Escaneo manual de procesos iniciado desde menu");
         processes_callback();
     }
 }
 
 static void on_scan_ports_menu_clicked(GtkMenuItem *item __attribute__((unused)), gpointer data __attribute__((unused))) {
-    // Cambiar a la pestaña de puertos
-    if (notebook != NULL) {
-        gtk_notebook_set_current_page(GTK_NOTEBOOK(notebook), 3);
-    }
-
-    // Ejecutar escaneo
     if (ports_callback) {
-        gui_add_log_entry("PORT_SCANNER", "INFO", "Escaneo manual de puertos iniciado desde menú");
+        gui_add_log_entry("PORT_SCANNER", "INFO", "Escaneo manual de puertos iniciado desde menu");
         ports_callback();
     }
 }
@@ -243,81 +220,57 @@ static GtkWidget* create_header_bar() {
     return header;
 }
 
-// NUEVA FUNCIÓN: Inicialización completa del sistema backend
 static int initialize_complete_backend_system(void) {
     gui_add_log_entry("STARTUP", "INFO", "=== INICIANDO SISTEMA BACKEND COMPLETO ===");
-    
-    // Paso 1: Inicializar el coordinador del sistema primero
-    if (init_system_coordinator() != 0) {
-        gui_add_log_entry("STARTUP", "CRITICAL", "FALLO CRÍTICO: No se pudo inicializar coordinador del sistema");
-        return -1;
-    }
-    gui_add_log_entry("STARTUP", "INFO", "✅ Coordinador del sistema inicializado");
-    
-    // Paso 2: Iniciar servicios automáticos
-    // USB: gui_usb_panel_create() ya inicio su propio monitoreo automatico
-    // al montarse -- no requiere una llamada de "init" separada aca.
-    // Procesos y Puertos: se inician bajo demanda cuando el usuario los solicita
-    notify_module_status_change("process", MODULE_STATUS_INACTIVE,
-                               "Listo para iniciar bajo demanda");
-    notify_module_status_change("ports", MODULE_STATUS_INACTIVE,
-                               "Listo para iniciar bajo demanda");
 
-    // Paso 3: Iniciar el coordinador del sistema
-    if (start_system_coordinator(5) != 0) {  // 5 segundos de intervalo
-        gui_add_log_entry("STARTUP", "CRITICAL", "FALLO CRÍTICO: No se pudo iniciar coordinador del sistema");
+    if (init_system_coordinator() != 0) {
+        gui_add_log_entry("STARTUP", "CRITICAL", "FALLO CRITICO: No se pudo inicializar coordinador del sistema");
         return -1;
     }
-    gui_add_log_entry("STARTUP", "INFO", "✅ Coordinador del sistema iniciado");
-    
-    // Paso 4: Realizar sincronización inicial
-    gui_add_log_entry("STARTUP", "INFO", "Realizando sincronización inicial del sistema...");
-    
-    // Esperar un momento para que los módulos se estabilicen
+    gui_add_log_entry("STARTUP", "INFO", "Coordinador del sistema inicializado");
+
+    // USB, Procesos y Puertos ya se inicializaron cuando gui_usb_panel_create()/
+    // gui_process_panel_create()/gui_ports_panel_create() se llamaron mas
+    // arriba en init_gui() -- cada panel administra su propio ciclo de vida,
+    // no hay un paso de "init" separado por modulo como antes.
+    notify_module_status_change("process", MODULE_STATUS_INACTIVE, "Listo para iniciar bajo demanda");
+    notify_module_status_change("ports", MODULE_STATUS_INACTIVE, "Listo para iniciar bajo demanda");
+
+    if (start_system_coordinator(5) != 0) {
+        gui_add_log_entry("STARTUP", "CRITICAL", "FALLO CRITICO: No se pudo iniciar coordinador del sistema");
+        return -1;
+    }
+    gui_add_log_entry("STARTUP", "INFO", "Coordinador del sistema iniciado");
+
+    gui_add_log_entry("STARTUP", "INFO", "Realizando sincronizacion inicial del sistema...");
     sleep(2);
-    
-    // Solicitar evaluación inmediata para establecer estado inicial
     request_immediate_system_evaluation();
-    
+
     gui_add_log_entry("STARTUP", "INFO", "=== SISTEMA BACKEND COMPLETAMENTE OPERATIVO ===");
-    
     return 0;
 }
 
-// NUEVA FUNCIÓN: Limpieza completa del sistema backend
 static void cleanup_complete_backend_system(void) {
     gui_add_log_entry("SHUTDOWN", "INFO", "=== INICIANDO LIMPIEZA COMPLETA DEL SISTEMA ===");
-    
-    // Limpiar en orden inverso al de inicialización para evitar dependencias rotas
-    
-    // Paso 1: Detener y limpiar el coordinador del sistema primero
     gui_add_log_entry("SHUTDOWN", "INFO", "Deteniendo coordinador del sistema...");
     cleanup_system_coordinator();
-    gui_add_log_entry("SHUTDOWN", "INFO", "✅ Coordinador del sistema finalizado");
-
+    gui_add_log_entry("SHUTDOWN", "INFO", "Coordinador del sistema finalizado");
     gui_add_log_entry("SHUTDOWN", "INFO", "=== LIMPIEZA COMPLETA FINALIZADA ===");
 }
 
-// NUEVA FUNCIÓN: Sincronización inteligente de todos los módulos
 static void intelligent_system_sync(void) {
-    gui_add_log_entry("SYNC", "INFO", "Iniciando sincronización inteligente del sistema...");
-    
-    // Obtener estado consolidado del coordinador
+    gui_add_log_entry("SYNC", "INFO", "Iniciando sincronizacion inteligente del sistema...");
+
     int total_devices, total_processes, total_ports, security_alerts;
-    if (get_consolidated_statistics(&total_devices, &total_processes, 
-                                   &total_ports, &security_alerts) == 0) {
-        
-        // Actualizar panel principal con estadísticas consolidadas
+    if (get_consolidated_statistics(&total_devices, &total_processes, &total_ports, &security_alerts) == 0) {
         gui_update_statistics(total_devices, total_processes, total_ports);
-        
-        // Registrar estadísticas actuales
+
         char stats_msg[512];
         snprintf(stats_msg, sizeof(stats_msg),
                  "Estado sincronizado: %d dispositivos USB, %d procesos, %d puertos abiertos, %d alertas",
                  total_devices, total_processes, total_ports, security_alerts);
         gui_add_log_entry("SYNC", "INFO", stats_msg);
-        
-        // Si hay alertas de seguridad, asegurar que el estado del sistema lo refleje
+
         if (security_alerts > 0) {
             SystemSecurityLevel level = get_current_security_level();
             if (level >= SECURITY_LEVEL_WARNING) {
@@ -325,21 +278,15 @@ static void intelligent_system_sync(void) {
             }
         }
     }
-    
-    // Sincronizar vistas individuales de módulos que estén activos
+
+    // USB ya se mantiene sincronizado por su propio gui_periodic_worker
+    // (con una primera invocacion inmediata al crear el panel en init_gui) --
+    // no hace falta un empujon manual aca como en el codigo anterior.
     if (is_process_monitoring_active()) {
         sync_gui_with_backend_processes();
     }
 
-    // USB: gui_usb_panel ya mantiene su propia lista sincronizada en vivo
-    // (cada cambio de estado se publica via post_usb_device_update() apenas
-    // ocurre, tanto desde el escaneo manual como desde el monitor
-    // automatico) -- no existe (ni hace falta) un sync_gui_with_usb_devices()
-    // independiente como el que exponia gui_usb_integration.c.
-
-    // Los puertos se sincronizan automáticamente cuando hay resultados disponibles
-    
-    gui_add_log_entry("SYNC", "INFO", "Sincronización inteligente completada");
+    gui_add_log_entry("SYNC", "INFO", "Sincronizacion inteligente completada");
 }
 
 void init_gui(int argc, char **argv) {
