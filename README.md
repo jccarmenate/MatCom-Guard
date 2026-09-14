@@ -54,7 +54,7 @@ make check-deps
 - 🔌 **Port Scanner**: quick scan (1-1024) and full scan (1-65535)
 - 📊 **Dashboard**: a consolidated view of system status
 - 📄 **Export PDF**: professional reports with one click
-- ⚙️ **Configuration**: `matcomguard.conf` file for customization
+- ⚙️ **Configuration**: `matcomguard.conf` for the backend, plus an in-app "Configuración" dialog
 
 ## 📸 Screenshots
 
@@ -75,22 +75,23 @@ make check-deps
 
 ## 🏗️ System Architecture
 
-MatCom Guard is built with a modern 3-layer architecture that ensures scalability, maintainability, and robustness:
+MatCom Guard is built with a 3-layer architecture that keeps the backend fully independent from the GUI:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                   PRESENTATION LAYER                         │
-│  ┌─────────────────┬─────────────────┬─────────────────┐    │
-│  │   Main           │   Specific       │   PDF/Log       │    │
-│  │   Dashboard       │   Panels         │   Reports       │    │
-│  └─────────────────┴─────────────────┴─────────────────┘    │
+│   "Night Watch" shell: icon rail + status badge + 5 panels   │
+│  ┌───────────┬───────────┬───────────┬───────────┬────────┐ │
+│  │ Dashboard │    USB    │ Processes │   Ports   │  Logs  │ │
+│  └───────────┴───────────┴───────────┴───────────┴────────┘ │
+│              Config dialog (tabbed, modal)                   │
 └─────────────────────────────────────────────────────────────┘
                                │
 ┌─────────────────────────────────────────────────────────────┐
 │                   INTEGRATION LAYER                          │
 │  ┌─────────────────┬─────────────────┬─────────────────┐    │
-│  │  GUI-Backend    │   System         │   Data           │    │
-│  │   Adapters      │   Coordinator    │   Adapters       │    │
+│  │  GUI-Backend    │   System         │   Thread         │    │
+│  │   Adapters      │   Coordinator    │   Bridge         │    │
 │  └─────────────────┴─────────────────┴─────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
                                │
@@ -103,12 +104,18 @@ MatCom Guard is built with a modern 3-layer architecture that ensures scalabilit
 └─────────────────────────────────────────────────────────────┘
 ```
 
+Each panel owns its own worker thread (or reuses the shared `gui_periodic_worker`
+module) and only ever touches GTK widgets through `g_idle_add`/
+`gui_thread_bridge_post` — the backend never calls into GTK directly.
+Navigation is a narrow icon rail on the left (Dashboard/USB/Processes/Ports/Logs);
+there's no tabbed notebook anymore.
+
 ### 🧩 Key Components
 
 #### **📊 Centralized Dashboard**
 - **Unified view** of every system module
 - **Real-time statistics** on devices, processes, and ports
-- **Global system status** with visual health indicators
+- **Global system status** with a color-coded status badge
 - **Quick access** to every main feature
 
 #### **💾 Advanced USB System**
@@ -117,14 +124,15 @@ typedef struct {
     char *device_name;          // Unique device identifier
     FileInfo **files;           // Dynamic array of analyzed files
     int file_count;             // File count in the snapshot
+    int capacity;                // Array capacity (files may be added incrementally)
     time_t snapshot_time;       // Snapshot creation timestamp
-    char sha256_hashes[64];     // Cryptographic hashes for integrity
 } DeviceSnapshot;
+// Each FileInfo carries its own sha256_hash[65] for integrity checking.
 ```
 
 **Differentiated functionality:**
-- **🔄 "Refresh" button**: the ONLY one able to retake reference snapshots
-- **🔍 "Deep Scan" button**: comparative analysis WITHOUT altering the baseline
+- **🔄 "Actualizar" button**: the ONLY one able to retake reference snapshots
+- **🔍 "Escaneo Profundo" button**: comparative analysis WITHOUT altering the baseline
 - **🚨 Alert System**: advanced threat-detection heuristics
 
 #### **⚡ Intelligent Process Monitor**
@@ -134,7 +142,8 @@ typedef struct {
     char name[256];             // Executable name
     float cpu_usage;            // CPU usage percentage
     float mem_usage;            // Memory usage percentage
-    time_t alerta_activa;       // Active alert timestamp
+    time_t inicio_alerta;       // Timestamp the active alert started
+    int alerta_activa;          // 1 if an alert is currently active
     int is_whitelisted;         // Whitelist status
 } ProcessInfo;
 ```
@@ -274,25 +283,33 @@ sudo ./matcom-guard
 ### **📁 Project Structure**
 ```
 MatCom-Guard-SO-Project/
-├── Makefile                    # Build system
-├── matcomguard.conf           # Configuration file
-├── README.md                  # This documentation
-├── include/                   # Project headers
-│   ├── common.h              # Common definitions
-│   ├── device_monitor.h      # USB device monitor
-│   ├── process_monitor.h     # Process monitor
-│   ├── port_scanner.h        # Port scanner
-│   └── gui*.h                # Graphical interface headers
-├── src/                      # Main source code
-│   ├── main.c               # Program entry point
-│   ├── device_monitor.c     # USB monitor implementation
-│   ├── process_monitor.c    # Process monitor implementation
-│   ├── port_scanner.c       # Port scanner implementation
-│   └── gui/                 # Graphical interface code
-│       ├── gui_main.c       # Main window and coordination
-│       ├── integration/     # GUI-Backend integration layer
-│       └── window/          # Window-specific components
-└── docs/                    # Additional documentation (if present)
+├── Makefile                       # Build system
+├── matcomguard.conf                # Backend config file (thresholds, whitelist)
+├── README.md / README.es.md       # This documentation
+├── include/                       # Project headers
+│   ├── device_monitor.h           # USB device monitor
+│   ├── process_monitor.h          # Process monitor
+│   ├── port_scanner.h             # Port scanner
+│   ├── threadpool.h, progress.h   # Shared backend/GUI primitives
+│   └── gui*.h                     # GUI: shell, panels, adapters, widgets
+├── src/                           # Main source code
+│   ├── main.c                     # Program entry point
+│   ├── device_monitor.c           # USB monitor implementation
+│   ├── process_monitor.c          # Process monitor implementation
+│   ├── port_scanner.c             # Port scanner implementation
+│   └── gui/                       # Graphical interface code
+│       ├── gui_main.c             # Window setup, backend lifecycle, action bar
+│       ├── gui_shell.c            # Night Watch shell: icon rail + status badge
+│       ├── gui_backend_adapters.c # Backend struct -> GUI struct conversions
+│       ├── gui_system_coordinator.c # Cross-module state, security scoring
+│       ├── gui_config_dialog.c    # Settings dialog (tabbed)
+│       ├── gui_thread_bridge.c    # Cross-thread-safe progress delivery
+│       ├── gui_periodic_worker.c  # Shared interruptible background-loop helper
+│       ├── panels/                # The 5 real panels (dashboard/usb/process/ports/logs)
+│       ├── widgets/                # guard_dial (Cairo gauge), gui_icons (Cairo icon set)
+│       └── window/                # gui_status.c (system-status -> shell badge glue)
+├── tests/unit/                    # Assert-based unit tests (see `make test-unit`)
+└── docs/                          # Design specs, plans, screenshots
 ```
 
 ## 📖 Usage Guide
@@ -376,23 +393,25 @@ Suspicious Activity:
 
 ### **⚙️ Flexible Configuration**
 
-MatCom Guard uses a `matcomguard.conf` configuration file that lets you customize the system's behavior:
+There are two independent configuration surfaces today:
 
+**Backend config** — `matcomguard.conf` (project root), read by `process_monitor.c`
+at startup:
 ```properties
 # File: matcomguard.conf
-UMBRAL_CPU=70.0          # CPU threshold for alerts (%)
-UMBRAL_RAM=50.0          # Memory threshold for alerts (%)
+UMBRAL_CPU=70.0          # CPU threshold for the backend's own alert loop (%)
+UMBRAL_RAM=50.0          # Memory threshold for the backend's own alert loop (%)
 INTERVALO=5              # Monitoring interval (seconds)
 DURACION_ALERTA=10       # Alert duration (seconds)
 WHITELIST=systemd,kthreadd,ksoftirqd,migration,rcu_gp,rcu_par_gp,watchdog,stress,yes
 ```
 
-**Configurable options:**
-- **Scan intervals**: configurable per module
-- **Alert thresholds**: customizable for CPU/memory
-- **Whitelist**: processes excluded from monitoring
-- **Notifications**: audible and visual alerts
-- **Filters**: log and report customization
+**GUI config** — the "Configuración" dialog (top action bar), persisted to
+`~/.config/matcom-guard/config.ini`. Its **Umbrales** tab (CPU/memory
+thresholds) drives the Process panel's row coloring directly. The other tabs
+(scan intervals, auto-scan toggles, sound/notifications, port range,
+whitelist) are stored and editable, but nothing currently reads them back
+into scan behavior — they're not wired to the backend yet.
 
 ### **🛡️ Thread-Safe Security**
 
@@ -410,28 +429,37 @@ int timeout_seconds = 3;
 
 ### **🔍 Main APIs**
 
-#### **USB Integration**
-```c
-int init_usb_integration(void);           // Initialization
-int start_usb_monitoring(int interval);   // Start monitoring
-int refresh_usb_snapshots(void);          // Exclusive refresh
-int deep_scan_usb_devices(void);          // Non-destructive analysis
-void cleanup_usb_integration(void);       // Robust cleanup
-```
+Each panel owns its module end-to-end: it builds its GTK widgets, wires the
+backend's callbacks, and exposes a small lifecycle API to `gui_main.c`.
 
-#### **Process Monitor**
+#### **USB Panel** (`gui_usb_panel.h`)
 ```c
-int init_process_monitoring(void);        // Initialization
-int start_process_monitoring(void);       // Start monitoring
-ProcessInfo* get_process_list(void);      // Get the process list
-void cleanup_process_monitoring(void);    // Cleanup
+GtkWidget *gui_usb_panel_create(void);     // Builds the panel, starts auto-monitoring
+void gui_usb_panel_shutdown(void);         // Stops monitoring, frees the snapshot cache
 ```
+Backed by `device_monitor.h`'s `create_device_snapshot_ex()` (cancellable,
+hash-pool-parallelized) and `free_device_snapshot()`.
 
-#### **Port Scanner**
+#### **Process Panel** (`gui_process_panel.h`)
 ```c
-ScanResult* scan_ports_range(int start, int end);  // Range scan
-int is_port_open(const char *host, int port);      // Check a port
-void free_scan_result(ScanResult *result);         // Free memory
+GtkWidget *gui_process_panel_create(void);
+void gui_process_panel_shutdown(void);
+int get_process_statistics_for_gui(int *total_processes, int *high_cpu_count,
+                                   int *high_memory_count, int *suspicious_count);
+```
+Backed by `process_monitor.h`'s `start_monitoring()`/`stop_monitoring()` and
+`get_process_list_copy()`.
+
+#### **Ports Panel** (`gui_ports_panel.h`)
+```c
+GtkWidget *gui_ports_panel_create(void);
+void gui_ports_panel_shutdown(void);
+```
+Backed by `port_scanner.h`'s real multi-threaded, cancellable scanner:
+```c
+int scan_ports_range(int start_port, int end_port, int num_threads,
+                      ProgressCallback cb, void *user_data,
+                      volatile sig_atomic_t *cancel, ScanResult *out);
 ```
 
 ### **🧪 Test Cases**

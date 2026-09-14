@@ -54,7 +54,7 @@ make check-deps
 - 🔌 **Escáner Puertos**: Escaneo rápido (1-1024) y completo (1-65535)
 - 📊 **Dashboard**: Vista consolidada del estado del sistema
 - 📄 **Exportar PDF**: Reportes profesionales con un clic
-- ⚙️ **Configuración**: Archivo `matcomguard.conf` para personalización
+- ⚙️ **Configuración**: `matcomguard.conf` para el backend, más un diálogo "Configuración" dentro de la app
 
 ## 📸 Capturas de Pantalla
 
@@ -75,40 +75,47 @@ make check-deps
 
 ## 🏗️ Arquitectura del Sistema
 
-MatCom Guard está construido con una arquitectura moderna de 3 capas que garantiza escalabilidad, mantenibilidad y robustez:
+MatCom Guard está construido con una arquitectura de 3 capas que mantiene el backend completamente independiente de la GUI:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    CAPA PRESENTACIÓN                        │
+│                    CAPA PRESENTACIÓN                         │
+│   Shell "Night Watch": riel de iconos + insignia + 5 paneles │
+│  ┌───────────┬───────────┬───────────┬───────────┬────────┐ │
+│  │ Dashboard │    USB    │ Procesos  │  Puertos  │ Logs   │ │
+│  └───────────┴───────────┴───────────┴───────────┴────────┘ │
+│           Diálogo de configuración (con pestañas, modal)     │
+└─────────────────────────────────────────────────────────────┘
+                               │
+┌─────────────────────────────────────────────────────────────┐
+│                 CAPA INTEGRACIÓN                             │
 │  ┌─────────────────┬─────────────────┬─────────────────┐    │
-│  │   Dashboard     │   Paneles       │   Reportes      │    │
-│  │   Principal     │   Específicos   │   PDF/Logs      │    │
+│  │  GUI-Backend    │   Coordinador   │   Puente de      │    │
+│  │   Adapters      │    Sistema      │   Hilos          │    │
 │  └─────────────────┴─────────────────┴─────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
                                │
 ┌─────────────────────────────────────────────────────────────┐
-│                 CAPA INTEGRACIÓN                            │
+│                   CAPA BACKEND                               │
 │  ┌─────────────────┬─────────────────┬─────────────────┐    │
-│  │  GUI-Backend    │   Coordinador   │   Adaptadores   │    │
-│  │   Adapters      │    Sistema      │    Datos        │    │
-│  └─────────────────┴─────────────────┴─────────────────┘    │
-└─────────────────────────────────────────────────────────────┘
-                               │
-┌─────────────────────────────────────────────────────────────┐
-│                   CAPA BACKEND                              │
-│  ┌─────────────────┬─────────────────┬─────────────────┐    │
-│  │   Monitor       │   Monitor       │   Escáner       │    │
-│  │     USB         │   Procesos      │   Puertos       │    │
+│  │   Monitor       │   Monitor       │   Escáner        │    │
+│  │     USB         │   Procesos      │   Puertos        │    │
 │  └─────────────────┴─────────────────┴─────────────────┘    │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+Cada panel tiene su propio hilo de trabajo (o reutiliza el módulo compartido
+`gui_periodic_worker`) y solo toca widgets de GTK a través de `g_idle_add`/
+`gui_thread_bridge_post` -- el backend nunca llama a GTK directamente. La
+navegación es un riel angosto de iconos a la izquierda (Dashboard/USB/
+Procesos/Puertos/Logs); ya no existe el notebook con pestañas.
 
 ### 🧩 Componentes Clave
 
 #### **📊 Dashboard Centralizado**
 - **Vista unificada** de todos los módulos del sistema
 - **Estadísticas en tiempo real** de dispositivos, procesos y puertos
-- **Estado global del sistema** con indicadores visuales de salud
+- **Estado global del sistema** con una insignia de estado con colores
 - **Acceso rápido** a todas las funcionalidades principales
 
 #### **💾 Sistema USB Avanzado**
@@ -117,9 +124,10 @@ typedef struct {
     char *device_name;          // Identificador único del dispositivo
     FileInfo **files;           // Array dinámico de archivos analizados
     int file_count;             // Contador de archivos en el snapshot
+    int capacity;                 // Capacidad del array (crece incrementalmente)
     time_t snapshot_time;       // Timestamp de creación del snapshot
-    char sha256_hashes[64];     // Hashes criptográficos para integridad
 } DeviceSnapshot;
+// Cada FileInfo tiene su propio sha256_hash[65] para verificar integridad.
 ```
 
 **Funcionalidad Diferenciada:**
@@ -134,7 +142,8 @@ typedef struct {
     char name[256];             // Nombre del ejecutable
     float cpu_usage;            // Porcentaje de CPU utilizado
     float mem_usage;            // Porcentaje de memoria utilizada
-    time_t alerta_activa;       // Timestamp de alerta activa
+    time_t inicio_alerta;       // Timestamp en que empezó la alerta activa
+    int alerta_activa;          // 1 si hay una alerta activa actualmente
     int is_whitelisted;         // Estado de lista blanca
 } ProcessInfo;
 ```
@@ -274,25 +283,33 @@ sudo ./matcom-guard
 ### **📁 Estructura del Proyecto**
 ```
 MatCom-Guard-SO-Project/
-├── Makefile                    # Sistema de compilación
-├── matcomguard.conf           # Archivo de configuración
-├── README.md                  # Esta documentación
-├── include/                   # Headers del proyecto
-│   ├── common.h              # Definiciones comunes
-│   ├── device_monitor.h      # Monitor de dispositivos USB
-│   ├── process_monitor.h     # Monitor de procesos
-│   ├── port_scanner.h        # Escáner de puertos
-│   └── gui*.h                # Headers de la interfaz gráfica
-├── src/                      # Código fuente principal
-│   ├── main.c               # Punto de entrada del programa
-│   ├── device_monitor.c     # Implementación del monitor USB
-│   ├── process_monitor.c    # Implementación del monitor de procesos
-│   ├── port_scanner.c       # Implementación del escáner de puertos
-│   └── gui/                 # Código de la interfaz gráfica
-│       ├── gui_main.c       # Ventana principal y coordinación
-│       ├── integration/     # Capa de integración GUI-Backend
-│       └── window/          # Componentes específicos de ventanas
-└── docs/                    # Documentación adicional (si existe)
+├── Makefile                       # Sistema de compilación
+├── matcomguard.conf                 # Config del backend (umbrales, whitelist)
+├── README.md / README.es.md       # Esta documentación
+├── include/                       # Headers del proyecto
+│   ├── device_monitor.h           # Monitor de dispositivos USB
+│   ├── process_monitor.h          # Monitor de procesos
+│   ├── port_scanner.h             # Escáner de puertos
+│   ├── threadpool.h, progress.h   # Primitivas compartidas backend/GUI
+│   └── gui*.h                     # GUI: shell, paneles, adaptadores, widgets
+├── src/                           # Código fuente principal
+│   ├── main.c                     # Punto de entrada del programa
+│   ├── device_monitor.c           # Implementación del monitor USB
+│   ├── process_monitor.c          # Implementación del monitor de procesos
+│   ├── port_scanner.c             # Implementación del escáner de puertos
+│   └── gui/                       # Código de la interfaz gráfica
+│       ├── gui_main.c             # Ventana, ciclo de vida del backend, barra de acciones
+│       ├── gui_shell.c            # Shell Night Watch: riel de iconos + insignia
+│       ├── gui_backend_adapters.c # Conversión de structs backend -> GUI
+│       ├── gui_system_coordinator.c # Estado entre módulos, puntaje de seguridad
+│       ├── gui_config_dialog.c    # Diálogo de configuración (con pestañas)
+│       ├── gui_thread_bridge.c    # Entrega de progreso segura entre hilos
+│       ├── gui_periodic_worker.c  # Bucle de fondo interrumpible, compartido
+│       ├── panels/                # Los 5 paneles reales (dashboard/usb/procesos/puertos/logs)
+│       ├── widgets/                # guard_dial (medidor Cairo), gui_icons (iconos Cairo)
+│       └── window/                # gui_status.c (estado del sistema -> insignia del shell)
+├── tests/unit/                    # Tests unitarios con assert (ver `make test-unit`)
+└── docs/                          # Specs de diseño, planes, capturas de pantalla
 ```
 
 ## 📖 Guía de Uso
@@ -376,23 +393,26 @@ Actividad Sospechosa:
 
 ### **⚙️ Configuración Flexible**
 
-MatCom Guard utiliza un archivo de configuración `matcomguard.conf` que permite personalizar el comportamiento del sistema:
+Hoy existen dos superficies de configuración independientes:
 
+**Config del backend** — `matcomguard.conf` (raíz del proyecto), leído por
+`process_monitor.c` al iniciar:
 ```properties
 # Archivo: matcomguard.conf
-UMBRAL_CPU=70.0          # Umbral de CPU para alertas (%)
-UMBRAL_RAM=50.0          # Umbral de memoria para alertas (%)
+UMBRAL_CPU=70.0          # Umbral de CPU para el propio bucle de alertas del backend (%)
+UMBRAL_RAM=50.0          # Umbral de memoria para el propio bucle de alertas del backend (%)
 INTERVALO=5              # Intervalo de monitoreo (segundos)
 DURACION_ALERTA=10       # Duración de alertas (segundos)
 WHITELIST=systemd,kthreadd,ksoftirqd,migration,rcu_gp,rcu_par_gp,watchdog,stress,yes
 ```
 
-**Opciones Configurables:**
-- **Intervalos de Escaneo**: Configurables por módulo
-- **Umbrales de Alerta**: Personalizables para CPU/memoria
-- **Lista Blanca**: Procesos excluidos del monitoreo
-- **Notificaciones**: Alertas sonoras y visuales
-- **Filtros**: Personalización de logs y reportes
+**Config de la GUI** — el diálogo "Configuración" (barra de acciones superior),
+persistido en `~/.config/matcom-guard/config.ini`. Su pestaña **Umbrales**
+(CPU/memoria) controla directamente el coloreado de filas del panel de
+Procesos. Las demás pestañas (intervalos de escaneo, auto-escaneo, sonido/
+notificaciones, rango de puertos, lista blanca) se guardan y son editables,
+pero nada las lee todavía para afectar el comportamiento real de los
+escaneos -- aún no están conectadas al backend.
 
 ### **🛡️ Seguridad Thread-Safe**
 
@@ -410,28 +430,38 @@ int timeout_seconds = 3;
 
 ### **🔍 APIs Principales**
 
-#### **Integración USB**
-```c
-int init_usb_integration(void);           // Inicialización
-int start_usb_monitoring(int interval);   // Inicio de monitoreo
-int refresh_usb_snapshots(void);          // Actualización exclusiva
-int deep_scan_usb_devices(void);          // Análisis no destructivo
-void cleanup_usb_integration(void);       // Limpieza robusta
-```
+Cada panel es dueño de su módulo de punta a punta: construye sus propios
+widgets de GTK, conecta los callbacks del backend, y expone una pequeña API
+de ciclo de vida a `gui_main.c`.
 
-#### **Monitor de Procesos**
+#### **Panel USB** (`gui_usb_panel.h`)
 ```c
-int init_process_monitoring(void);        // Inicialización
-int start_process_monitoring(void);       // Inicio de monitoreo
-ProcessInfo* get_process_list(void);      // Obtener lista de procesos
-void cleanup_process_monitoring(void);    // Limpieza
+GtkWidget *gui_usb_panel_create(void);     // Construye el panel, inicia auto-monitoreo
+void gui_usb_panel_shutdown(void);         // Detiene el monitoreo, libera el cache de snapshots
 ```
+Respaldado por `create_device_snapshot_ex()` de `device_monitor.h`
+(cancelable, paralelizado con pool de hashing) y `free_device_snapshot()`.
 
-#### **Escáner de Puertos**
+#### **Panel de Procesos** (`gui_process_panel.h`)
 ```c
-ScanResult* scan_ports_range(int start, int end);  // Escaneo por rango
-int is_port_open(const char *host, int port);      // Verificar puerto
-void free_scan_result(ScanResult *result);         // Liberar memoria
+GtkWidget *gui_process_panel_create(void);
+void gui_process_panel_shutdown(void);
+int get_process_statistics_for_gui(int *total_processes, int *high_cpu_count,
+                                   int *high_memory_count, int *suspicious_count);
+```
+Respaldado por `start_monitoring()`/`stop_monitoring()` y
+`get_process_list_copy()` de `process_monitor.h`.
+
+#### **Panel de Puertos** (`gui_ports_panel.h`)
+```c
+GtkWidget *gui_ports_panel_create(void);
+void gui_ports_panel_shutdown(void);
+```
+Respaldado por el escáner real multi-hilo y cancelable de `port_scanner.h`:
+```c
+int scan_ports_range(int start_port, int end_port, int num_threads,
+                      ProgressCallback cb, void *user_data,
+                      volatile sig_atomic_t *cancel, ScanResult *out);
 ```
 
 ### **🧪 Casos de Prueba**
