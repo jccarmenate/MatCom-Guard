@@ -540,6 +540,23 @@ void gui_usb_panel_shutdown(void) {
     cleanup_usb_snapshot_cache();
 }
 
+// A diferencia de gui_usb_panel_shutdown(), esto NO toca usb_hash_pool ni el
+// cache de snapshots -- solo detiene/reinicia el ciclo de auto-monitoreo, para
+// que el boton Pausar/Reanudar de la barra superior pueda usarlo en caliente
+// sin perder el estado del panel.
+void gui_usb_panel_pause_auto_monitor(void) {
+    if (usb_auto_monitor_worker) {
+        gui_periodic_worker_stop(usb_auto_monitor_worker);
+        usb_auto_monitor_worker = NULL;
+    }
+}
+
+void gui_usb_panel_resume_auto_monitor(void) {
+    if (!usb_auto_monitor_worker) {
+        usb_auto_monitor_worker = gui_periodic_worker_start(USB_AUTO_MONITOR_INTERVAL_SECONDS, usb_auto_monitor_work, NULL);
+    }
+}
+
 // ============================================================================
 // COMPATIBILIDAD CON EL COORDINADOR Y EL MENU "ESCANEAR" DEL HEADER BAR
 // ============================================================================

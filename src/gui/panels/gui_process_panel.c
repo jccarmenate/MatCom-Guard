@@ -374,6 +374,25 @@ void gui_process_panel_shutdown(void) {
     cleanup_monitoring();
 }
 
+// A diferencia de gui_process_panel_shutdown(), esto NO llama cleanup_monitoring()
+// -- solo detiene/reinicia el hilo de monitoreo, para que el boton Pausar/Reanudar
+// de la barra superior pueda usarlo en caliente sin perder la lista de procesos.
+void gui_process_panel_pause_monitoring(void) {
+    if (is_monitoring_active()) {
+        stop_monitoring();
+    }
+}
+
+void gui_process_panel_resume_monitoring(void) {
+    if (!is_monitoring_active()) {
+        if (start_monitoring() == 0) {
+            guard_dial_set_progress(process_dial, 0, 0, "Monitoreo activo");
+        } else {
+            gui_add_log_entry("PROCESS_SCANNER", "ERROR", "No se pudo reanudar el monitoreo de procesos");
+        }
+    }
+}
+
 // ============================================================================
 // COMPATIBILIDAD CON EL COORDINADOR, intelligent_system_sync Y EL MENU "ESCANEAR"
 // ============================================================================

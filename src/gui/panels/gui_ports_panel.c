@@ -438,6 +438,10 @@ void gui_ports_panel_shutdown(void) {
     }
 }
 
+void gui_ports_panel_cancel_current_scan(void) {
+    gui_ports_panel_shutdown();
+}
+
 // ============================================================================
 // COMPATIBILIDAD CON EL COORDINADOR Y EL MENU "ESCANEAR"
 // ============================================================================

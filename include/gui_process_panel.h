@@ -10,6 +10,14 @@ GtkWidget *gui_process_panel_create(void);
 /** Detiene el monitoreo de procesos si esta activo y libera sus recursos. */
 void gui_process_panel_shutdown(void);
 
+/** Detiene el monitoreo de procesos sin liberar recursos del panel (a diferencia
+ *  de gui_process_panel_shutdown). Usado por el boton Pausar/Reanudar. */
+void gui_process_panel_pause_monitoring(void);
+
+/** Reinicia el monitoreo de procesos detenido por gui_process_panel_pause_monitoring().
+ *  No-op si ya esta activo. */
+void gui_process_panel_resume_monitoring(void);
+
 /** Callback compatible con ScanProcessesCallback (gui.h) para el menu "Escanear". */
 void gui_compatible_scan_processes(void);
 

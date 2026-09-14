@@ -23,6 +23,16 @@ ScanProcessesCallback processes_callback = NULL;
 ScanPortsCallback ports_callback = NULL;
 ExportReportCallback report_callback = NULL;
 
+// Estado del boton Pausar/Reanudar de la barra superior. monitoring_paused
+// bloquea los escaneos manuales mientras el sistema esta pausado (evita que
+// el usuario dispare un escaneo sobre un monitoreo que acaba de detener).
+// process_monitoring_was_active_before_pause existe porque, a diferencia de
+// USB y del coordinador (que arrancan solos al iniciar la app), el monitoreo
+// de procesos solo arranca cuando el usuario lo pide -- Reanudar no debe
+// encenderlo si nunca estuvo corriendo.
+static gboolean monitoring_paused = FALSE;
+static gboolean process_monitoring_was_active_before_pause = FALSE;
+
 // Declaraciones de funciones
 static void on_window_destroy(GtkWidget *widget, gpointer data);
 static int initialize_complete_backend_system(void);
@@ -64,6 +74,17 @@ static void on_window_destroy(GtkWidget *widget __attribute__((unused)), gpointe
 
 // Callbacks para los botones del header
 static void on_scan_all_clicked(GtkMenuItem *item __attribute__((unused)), gpointer data __attribute__((unused))) {
+    if (monitoring_paused) {
+        GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(main_window), GTK_DIALOG_MODAL,
+            GTK_MESSAGE_INFO, GTK_BUTTONS_OK,
+            "El sistema esta pausado.\n\nPara realizar un escaneo completo, primero reactive "
+            "el monitoreo con el boton 'Reanudar' en la barra superior.");
+        gtk_dialog_run(GTK_DIALOG(dialog));
+        gtk_widget_destroy(dialog);
+        gui_add_log_entry("SCANNER", "WARNING", "Escaneo completo cancelado - sistema pausado");
+        return;
+    }
+
     gui_add_log_entry("SCANNER", "INFO", "Iniciando escaneo completo del sistema");
     gui_set_scanning_status(TRUE);
 
@@ -88,6 +109,10 @@ static gboolean gui_set_scanning_status_timeout(gpointer user_data) {
 
 static void on_scan_usb_menu_clicked(GtkMenuItem *item __attribute__((unused)), gpointer data __attribute__((unused))) {
     gui_shell_set_active_page(1);
+    if (monitoring_paused) {
+        gui_add_log_entry("USB_SCANNER", "WARNING", "Escaneo USB cancelado - sistema pausado");
+        return;
+    }
     if (usb_callback) {
         gui_add_log_entry("USB_SCANNER", "INFO", "Escaneo manual de USB iniciado desde menu");
         usb_callback();
@@ -96,6 +121,10 @@ static void on_scan_usb_menu_clicked(GtkMenuItem *item __attribute__((unused)), 
 
 static void on_scan_processes_menu_clicked(GtkMenuItem *item __attribute__((unused)), gpointer data __attribute__((unused))) {
     gui_shell_set_active_page(2);
+    if (monitoring_paused) {
+        gui_add_log_entry("PROCESS_SCANNER", "WARNING", "Escaneo de procesos cancelado - sistema pausado");
+        return;
+    }
     if (processes_callback) {
         gui_add_log_entry("PROCESS_SCANNER", "INFO", "Escaneo manual de procesos iniciado desde menu");
         processes_callback();
@@ -104,6 +133,10 @@ static void on_scan_processes_menu_clicked(GtkMenuItem *item __attribute__((unus
 
 static void on_scan_ports_menu_clicked(GtkMenuItem *item __attribute__((unused)), gpointer data __attribute__((unused))) {
     gui_shell_set_active_page(3);
+    if (monitoring_paused) {
+        gui_add_log_entry("PORT_SCANNER", "WARNING", "Escaneo de puertos cancelado - sistema pausado");
+        return;
+    }
     if (ports_callback) {
         gui_add_log_entry("PORT_SCANNER", "INFO", "Escaneo manual de puertos iniciado desde menu");
         ports_callback();
@@ -112,13 +145,34 @@ static void on_scan_ports_menu_clicked(GtkMenuItem *item __attribute__((unused))
 
 static void on_monitor_toggle_clicked(GtkToggleButton *button, gpointer data __attribute__((unused))) {
     gboolean is_active = gtk_toggle_button_get_active(button);
-    
+
     if (is_active) {
         gtk_button_set_label(GTK_BUTTON(button), "⏸️ Pausar");
+        monitoring_paused = FALSE;
+
+        gui_usb_panel_resume_auto_monitor();
+        if (process_monitoring_was_active_before_pause) {
+            gui_process_panel_resume_monitoring();
+        }
+        start_system_coordinator(5);
+
         gui_add_log_entry("SISTEMA", "INFO", "Monitoreo automático reanudado");
         gui_update_system_status("Sistema Operativo", TRUE);
+        request_immediate_system_evaluation();
     } else {
         gtk_button_set_label(GTK_BUTTON(button), "▶️ Reanudar");
+
+        // Recordar que estaba corriendo antes de pausar -- a diferencia de USB
+        // y del coordinador, el monitoreo de procesos no arranca solo, asi que
+        // Reanudar no debe encenderlo si el usuario nunca lo pidio.
+        process_monitoring_was_active_before_pause = is_process_monitoring_active();
+
+        gui_usb_panel_pause_auto_monitor();
+        gui_process_panel_pause_monitoring();
+        gui_ports_panel_cancel_current_scan();
+        stop_system_coordinator();
+        monitoring_paused = TRUE;
+
         gui_add_log_entry("SISTEMA", "WARNING", "Monitoreo automático pausado");
         gui_update_system_status("Monitoreo Pausado", FALSE);
     }
