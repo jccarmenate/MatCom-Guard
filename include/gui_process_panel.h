@@ -13,4 +13,8 @@ void gui_process_panel_shutdown(void);
 /** Callback compatible con ScanProcessesCallback (gui.h) para el menu "Escanear". */
 void gui_compatible_scan_processes(void);
 
+int is_process_monitoring_active(void);
+int get_process_statistics_for_gui(int *total_processes, int *high_cpu_count, int *high_memory_count, int *suspicious_count);
+int sync_gui_with_backend_processes(void);
+
 #endif // GUI_PROCESS_PANEL_H

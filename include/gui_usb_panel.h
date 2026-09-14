@@ -13,4 +13,8 @@ void gui_usb_panel_shutdown(void);
 /** Callback compatible con ScanUSBCallback (gui.h) para el menu "Escanear" del header bar. */
 void gui_compatible_scan_usb(void);
 
+int is_usb_monitoring_active(void);
+int is_gui_usb_scan_in_progress(void);
+int get_usb_statistics_for_gui(int *total_devices, int *suspicious_devices, int *total_files, int *files_with_changes);
+
 #endif // GUI_USB_PANEL_H

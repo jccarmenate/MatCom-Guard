@@ -23,7 +23,7 @@ SRC = src/main.c \
 		src/gui/panels/gui_ports_panel.c \
 		src/gui/window/gui_status.c \
 		src/gui/gui_config_dialog.c \
-		src/gui/integration/gui_system_coordinator.c \
+		src/gui/gui_system_coordinator.c \
 		src/gui/gui_backend_adapters.c
 
 .PHONY: all clean install test
