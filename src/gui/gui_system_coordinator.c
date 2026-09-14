@@ -3,6 +3,7 @@
 #include "gui_internal.h"
 #include "gui_periodic_worker.h"
 #include "gui_thread_bridge.h"
+#include "gui_dashboard_panel.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -173,6 +174,7 @@ static void on_coordinator_status_update(const ProgressUpdate *update, void *ui_
     gui_update_statistics(local_state.aggregate_stats.total_usb_devices,
                            local_state.aggregate_stats.total_processes_monitored,
                            local_state.aggregate_stats.open_ports_found);
+    gui_update_usb_suspicious_count(local_state.aggregate_stats.suspicious_usb_devices);
 
     gboolean system_healthy = (local_state.security_level <= SECURITY_LEVEL_MONITORING);
     gui_update_system_status(update->phase, system_healthy);

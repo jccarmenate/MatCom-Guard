@@ -66,6 +66,12 @@ static volatile sig_atomic_t port_scan_running = 0;
 static int port_scan_start_value = 1;
 static int port_scan_end_value = 1024;
 
+// Protege las tres estadisticas de abajo: se escriben en on_port_scan_done_idle
+// (hilo principal, via idle callback de GLib) y se leen desde
+// get_port_statistics_for_gui(), que el coordinador del sistema invoca desde
+// su propio hilo de fondo -- sin este mutex serian una carrera de datos entre
+// hilos, igual que el equivalente usb_stats_mutex en gui_usb_panel.c.
+static pthread_mutex_t ports_stats_mutex = PTHREAD_MUTEX_INITIALIZER;
 static int port_last_total_open = 0;
 static int port_last_total_suspicious = 0;
 static time_t port_last_scan_time = 0;
@@ -150,6 +156,10 @@ void gui_update_port(GUIPort *port) {
         gtk_container_add(GTK_CONTAINER(row), hbox);
 
         refs = malloc(sizeof(PortRowRefs));
+        if (!refs) {
+            gtk_widget_destroy(row);
+            return;
+        }
         refs->dot = dot;
         refs->primary = primary;
         refs->secondary = secondary;
@@ -203,11 +213,15 @@ static gboolean on_port_scan_done_idle(gpointer data) {
                 gui_update_port(&gp);
             }
         }
+        pthread_mutex_lock(&ports_stats_mutex);
         aggregate_port_statistics(msg->result.ports, msg->result.total_ports,
                                    &port_last_total_open, &port_last_total_suspicious);
+        pthread_mutex_unlock(&ports_stats_mutex);
         free(msg->result.ports);
     }
+    pthread_mutex_lock(&ports_stats_mutex);
     port_last_scan_time = time(NULL);
+    pthread_mutex_unlock(&ports_stats_mutex);
 
     char summary[128];
     if (port_cancel_flag) {
@@ -436,9 +450,11 @@ int get_port_statistics_for_gui(int *total_open, int *total_suspicious, time_t *
     if (!total_open || !total_suspicious || !last_scan_time) {
         return -1;
     }
+    pthread_mutex_lock(&ports_stats_mutex);
     *total_open = port_last_total_open;
     *total_suspicious = port_last_total_suspicious;
     *last_scan_time = port_last_scan_time;
+    pthread_mutex_unlock(&ports_stats_mutex);
     return 0;
 }
 

@@ -193,6 +193,64 @@ static void test_usb_snapshot_cache(void) {
     cleanup_usb_snapshot_cache(); // Libera `snap` internamente vía free_device_snapshot.
 }
 
+// Construye un device_name con secuencias UTF-8 de 3 bytes ("€" = 0xE2 0x82 0xAC)
+// posicionadas exactamente en los límites de truncamiento de gui_device.device_name
+// (128 bytes) y de gui_device.mount_point ("/media/" + device_name, 256 bytes).
+// Si adapt_device_snapshot_to_gui volviera a usar un snprintf ingenuo para
+// mount_point (el bug original), el corte caería en medio de la secuencia y
+// dejaría un byte de continuación (0x80-0xBF) colgando al final del buffer.
+static void test_adapt_device_snapshot_to_gui_utf8_boundaries(void) {
+    char device_name_buf[300];
+    memset(device_name_buf, 'A', sizeof(device_name_buf));
+
+    // Límite del campo device_name: dest_size 128 -> corte ingenuo en el
+    // byte de índice 127. Colocamos "€" en 125-127 para que el corte caiga
+    // sobre su segundo byte de continuación.
+    device_name_buf[125] = (char)0xE2;
+    device_name_buf[126] = (char)0x82;
+    device_name_buf[127] = (char)0xAC;
+
+    // Límite del campo mount_point: dest_size 256, y "/media/" ocupa los
+    // primeros 7 bytes, así que el corte ingenuo cae en el byte de índice
+    // 248 de device_name (255 - 7). Colocamos "€" en 246-248 para que el
+    // corte caiga sobre su segundo byte de continuación.
+    device_name_buf[246] = (char)0xE2;
+    device_name_buf[247] = (char)0x82;
+    device_name_buf[248] = (char)0xAC;
+    device_name_buf[249] = '\0';
+
+    DeviceSnapshot *snap = make_snapshot(device_name_buf, 2);
+    snap->files[snap->file_count++] = make_file("/media/DEV/a.txt", "hash_a");
+    snap->files[snap->file_count++] = make_file("/media/DEV/b.txt", "hash_b");
+    snap->snapshot_time = 424242;
+
+    GUIUSBDevice gp;
+    assert(adapt_device_snapshot_to_gui(snap, NULL, &gp) == 0);
+
+    // device_name: null-terminado y sin byte de continuación colgante al final.
+    size_t dn_len = strlen(gp.device_name);
+    assert(dn_len < sizeof(gp.device_name));
+    if (dn_len > 0) {
+        unsigned char last = (unsigned char)gp.device_name[dn_len - 1];
+        assert(!(last >= 0x80 && last <= 0xBF));
+    }
+
+    // mount_point: null-terminado, empieza con "/media/" y sin byte de
+    // continuación colgante al final.
+    size_t mp_len = strlen(gp.mount_point);
+    assert(mp_len < sizeof(gp.mount_point));
+    assert(strncmp(gp.mount_point, "/media/", 7) == 0);
+    if (mp_len > 0) {
+        unsigned char last = (unsigned char)gp.mount_point[mp_len - 1];
+        assert(!(last >= 0x80 && last <= 0xBF));
+    }
+
+    assert(gp.total_files == 2);
+    assert(gp.last_scan == 424242);
+
+    free_device_snapshot(snap);
+}
+
 static void test_format_timestamp_for_gui(void) {
     char buf[64];
     assert(format_timestamp_for_gui(0, buf, sizeof(buf)) == 0);
@@ -222,6 +280,7 @@ int main(void) {
     test_adapt_process_info_to_gui();
     test_evaluate_usb_suspicion();
     test_detect_usb_changes();
+    test_adapt_device_snapshot_to_gui_utf8_boundaries();
     test_generate_status_strings();
     test_adapt_port_info_to_gui();
     test_aggregate_port_statistics();

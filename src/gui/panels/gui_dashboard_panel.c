@@ -102,8 +102,9 @@ void gui_update_statistics(int usb_devices, int processes, int open_ports) {
     else if (open_ports > 10) ports_class = "nw-value-warning";
     set_value_class(stats_ports_open, ports_class);
 
-    // El conteo de USB sospechosos llega por gui_update_usb_device (Task 7),
-    // no por este agregado -- se deja en su valor actual.
+    // El conteo de USB sospechosos no llega por este agregado -- lo entrega
+    // el coordinador del sistema via gui_update_usb_suspicious_count(), mas
+    // abajo, a partir de local_state.aggregate_stats.suspicious_usb_devices.
 
     time_t now = time(NULL);
     struct tm *tm_info = localtime(&now);
@@ -118,4 +119,13 @@ void gui_update_statistics(int usb_devices, int processes, int open_ports) {
              "Estadisticas actualizadas - USB: %d, Procesos: %d, Puertos: %d",
              usb_devices, processes, open_ports);
     gui_add_log_entry("ESTADISTICAS", "INFO", log_message);
+}
+
+void gui_update_usb_suspicious_count(int suspicious_count) {
+    if (!stats_usb_suspicious) return;
+
+    char text[32];
+    snprintf(text, sizeof(text), "%d", suspicious_count);
+    gtk_label_set_text(GTK_LABEL(stats_usb_suspicious), text);
+    set_value_class(stats_usb_suspicious, suspicious_count > 0 ? "nw-value-critical" : NULL);
 }

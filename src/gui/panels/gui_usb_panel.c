@@ -143,6 +143,10 @@ void gui_update_usb_device(GUIUSBDevice *device) {
         gtk_container_add(GTK_CONTAINER(row), hbox);
 
         refs = malloc(sizeof(UsbRowRefs));
+        if (!refs) {
+            gtk_widget_destroy(row);
+            return;
+        }
         refs->dot = dot;
         refs->primary = primary;
         refs->secondary = secondary;

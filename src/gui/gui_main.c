@@ -37,6 +37,14 @@ static gboolean intelligent_system_sync_timeout(gpointer user_data);
 static void on_window_destroy(GtkWidget *widget __attribute__((unused)), gpointer data __attribute__((unused))) {
     gui_add_log_entry("SISTEMA", "INFO", "Cerrando MatCom Guard - iniciando secuencia de apagado seguro...");
 
+    // Detener el coordinador PRIMERO: su hilo de fondo lee el cache de
+    // snapshots USB y otro estado que los paneles liberan a continuacion --
+    // si el coordinador siguiera activo mientras gui_usb_panel_shutdown()
+    // libera ese cache, un tick concurrente del coordinador leeria memoria
+    // ya liberada. stop_system_coordinator() hace join de su hilo antes de
+    // retornar, asi que despues de esta linea no hay ningun lector activo.
+    stop_system_coordinator();
+
     // Detener el panel USB (monitoreo automatico + escaneo manual en curso)
     // antes de tocar el resto del sistema backend.
     gui_usb_panel_shutdown();

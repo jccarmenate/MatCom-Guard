@@ -117,6 +117,10 @@ void gui_update_process(GUIProcess *process) {
         gtk_container_add(GTK_CONTAINER(row), hbox);
 
         refs = malloc(sizeof(ProcessRowRefs));
+        if (!refs) {
+            gtk_widget_destroy(row);
+            return;
+        }
         refs->dot = dot;
         refs->primary = primary;
         refs->secondary = secondary;

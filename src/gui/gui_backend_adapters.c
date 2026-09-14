@@ -90,7 +90,9 @@ int adapt_device_snapshot_to_gui(const DeviceSnapshot *snapshot,
     memset(gui_device, 0, sizeof(GUIUSBDevice));
 
     utf8_safe_truncate(snapshot->device_name, gui_device->device_name, sizeof(gui_device->device_name));
-    snprintf(gui_device->mount_point, sizeof(gui_device->mount_point), "/media/%s", snapshot->device_name);
+    char full_mount_path[512];
+    snprintf(full_mount_path, sizeof(full_mount_path), "/media/%s", snapshot->device_name);
+    utf8_safe_truncate(full_mount_path, gui_device->mount_point, sizeof(gui_device->mount_point));
     gui_device->total_files = snapshot->file_count;
     gui_device->last_scan = snapshot->snapshot_time;
 
