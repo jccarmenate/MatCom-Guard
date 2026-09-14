@@ -403,32 +403,6 @@ int notify_module_status_change(const char *module_name, ModuleStatus new_status
     return 0;
 }
 
-int update_coordinator_configuration(int update_interval, int security_evaluation_sensitivity_param) {
-    if (update_interval < 1 || update_interval > 300) {
-        gui_add_log_entry("SYSTEM_COORDINATOR", "ERROR", "Intervalo de actualizacion invalido (1-300 segundos)");
-        return -1;
-    }
-    if (security_evaluation_sensitivity_param < 1 || security_evaluation_sensitivity_param > 10) {
-        gui_add_log_entry("SYSTEM_COORDINATOR", "ERROR", "Sensibilidad de evaluacion invalida (1-10)");
-        return -1;
-    }
-
-    security_evaluation_sensitivity = security_evaluation_sensitivity_param;
-
-    if (coordinator_worker) {
-        // Reiniciar con el nuevo intervalo: el periodic worker no soporta
-        // cambiar su propio intervalo en caliente.
-        gui_periodic_worker_stop(coordinator_worker);
-        coordinator_worker = gui_periodic_worker_start(update_interval, coordinator_work, NULL);
-    }
-
-    char msg[256];
-    snprintf(msg, sizeof(msg), "Configuracion coordinador actualizada: intervalo=%ds, sensibilidad=%d/10",
-             update_interval, security_evaluation_sensitivity_param);
-    gui_add_log_entry("SYSTEM_COORDINATOR", "INFO", msg);
-    return 0;
-}
-
 int request_immediate_system_evaluation(void) {
     if (!coordinator_worker) {
         gui_add_log_entry("SYSTEM_COORDINATOR", "WARNING", "No se puede evaluar: coordinador no esta activo");

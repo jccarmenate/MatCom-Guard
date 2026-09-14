@@ -84,7 +84,6 @@ int notify_security_event(const char *source_module, int event_severity,
 int notify_module_status_change(const char *module_name, ModuleStatus new_status,
                                const char *status_description);
 
-int update_coordinator_configuration(int update_interval, int security_evaluation_sensitivity);
 int request_immediate_system_evaluation(void);
 
 #endif // GUI_SYSTEM_COORDINATOR_H

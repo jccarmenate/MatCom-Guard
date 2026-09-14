@@ -72,10 +72,6 @@ label.nw-panel-title {
     font-size: 16px;
 }
 
-box.nw-toolbar {
-    padding: 4px 0 12px 0;
-}
-
 button.nw-button-primary {
     background-color: rgba(217, 142, 63, 0.15);
     background-image: none;

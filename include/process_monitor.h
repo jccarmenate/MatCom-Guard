@@ -75,8 +75,6 @@ typedef struct {
 // Configuración
 void load_config(void);
 void save_config(void);
-void update_cpu_threshold(float new_threshold);
-void update_ram_threshold(float new_threshold);
 Config* get_config();
 
 // Control de monitoreo básico
@@ -87,7 +85,6 @@ ProcessInfo* get_process_info(pid_t pid);
 int start_monitoring();
 int stop_monitoring();
 int is_monitoring_active();
-void set_monitoring_interval(int seconds);
 void set_process_callbacks(ProcessCallbacks *callbacks);
 
 // Funciones thread-safe para acceder a datos

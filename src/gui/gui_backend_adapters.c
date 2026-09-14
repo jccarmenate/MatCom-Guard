@@ -282,32 +282,6 @@ void cleanup_usb_snapshot_cache(void) {
 // UTILIDADES DE FORMATEO
 // ============================================================================
 
-int format_timestamp_for_gui(time_t timestamp, char *buffer, size_t buffer_size) {
-    if (!buffer || buffer_size == 0) {
-        return -1;
-    }
-
-    if (timestamp == 0) {
-        utf8_safe_truncate("Nunca", buffer, buffer_size);
-        return 0;
-    }
-
-    time_t now = time(NULL);
-    int diff = (int)(now - timestamp);
-
-    if (diff < 60) {
-        snprintf(buffer, buffer_size, "Hace %d seg", diff);
-    } else if (diff < 3600) {
-        snprintf(buffer, buffer_size, "Hace %d min", diff / 60);
-    } else if (diff < 86400) {
-        snprintf(buffer, buffer_size, "Hace %d horas", diff / 3600);
-    } else {
-        snprintf(buffer, buffer_size, "Hace %d dias", diff / 86400);
-    }
-
-    return 0;
-}
-
 int generate_usb_status_string(int files_changed, gboolean is_suspicious,
                               gboolean is_scanning, char *status_buffer,
                               size_t buffer_size) {
@@ -601,28 +575,4 @@ void wrap_text_for_pdf(const char *input, char *output, size_t output_size, int 
     }
 
     output[output_pos] = '\0';
-}
-
-int count_wrapped_lines(const char *text, int max_width) {
-    if (!text || max_width <= 0) {
-        return 0;
-    }
-
-    int line_count = 0;
-    size_t text_len = strlen(text);
-    size_t line_start = 0;
-
-    for (size_t i = 0; i <= text_len; i++) {
-        if (text[i] == '\n' || text[i] == '\0') {
-            size_t line_len = i - line_start;
-            if (line_len <= (size_t)max_width) {
-                line_count++;
-            } else {
-                line_count += (line_len + max_width - 1) / max_width;
-            }
-            line_start = i + 1;
-        }
-    }
-
-    return line_count;
 }

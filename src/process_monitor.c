@@ -136,41 +136,6 @@ void load_config(void) {
     pthread_mutex_unlock(&mutex);
 }
 
-/**
- * Actualiza dinámicamente el umbral de CPU
- * 
- * @param new_threshold: Nuevo umbral de CPU (0-100)
- * 
- * MODIFICACIÓN: Eliminado printf de debugging, ahora usa logging estructurado
- * para evitar spam en consola durante producción.
- */
-void update_cpu_threshold(float new_threshold) {
-    if (new_threshold > 0 && new_threshold <= 100) {
-        pthread_mutex_lock(&mutex);
-        config.max_cpu_usage = new_threshold;
-        pthread_mutex_unlock(&mutex);
-        // CAMBIO: Eliminado printf("[INFO] Umbral de CPU actualizado a %.1f%%\n", new_threshold);
-        // Se mantiene solo el logging estructurado interno
-        save_config(); // Persistir cambios
-    }
-}
-
-/**
- * Actualiza dinámicamente el umbral de memoria
- * 
- * @param new_threshold: Nuevo umbral de memoria (0-100)
- * 
- * MODIFICACIÓN: Eliminado printf de debugging, simplificado para producción.
- */
-void update_memory_threshold(float new_threshold) {
-    if (new_threshold > 0 && new_threshold <= 100) {
-        pthread_mutex_lock(&mutex);
-        config.max_ram_usage = new_threshold;
-        pthread_mutex_unlock(&mutex);
-        // CAMBIO: Eliminado printf("[INFO] Umbral de memoria actualizado a %.1f%%\n", new_threshold);
-        save_config(); // Persistir cambios
-    }
-}
 
 /**
  * Obtiene acceso de solo lectura a la configuración actual
@@ -595,17 +560,6 @@ int is_monitoring_active(void) {
     int active = monitoring_active;
     pthread_mutex_unlock(&mutex);
     return active;
-}
-
-void set_monitoring_interval(int seconds) {
-    if (seconds < 1) seconds = 1;
-    if (seconds > 3600) seconds = 3600; // Max 1 hora
-    
-    pthread_mutex_lock(&mutex);
-    config.check_interval = seconds;
-    pthread_mutex_unlock(&mutex);
-    
-    printf("[INFO] Intervalo de monitoreo cambiado a %d segundos\n", seconds);
 }
 
 MonitoringStats get_monitoring_stats(void) {

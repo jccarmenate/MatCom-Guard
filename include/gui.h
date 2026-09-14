@@ -42,7 +42,6 @@ void gui_add_log_entry(const char *module, const char *level, const char *messag
 void gui_update_usb_device(GUIUSBDevice *device);
 void gui_update_process(GUIProcess *process);
 void gui_update_port(GUIPort *port);
-gboolean gui_update_port_main_thread_wrapper(gpointer user_data);
 void gui_update_statistics(int usb_devices, int processes, int open_ports);
 void gui_update_system_status(const char *status, gboolean is_healthy);
 void gui_set_scanning_status(gboolean is_scanning);

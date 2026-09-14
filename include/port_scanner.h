@@ -14,8 +14,6 @@
 #include "progress.h"
 #include "threadpool.h"
 
-#define SEPARATOR "=====================================\n"
-
 // ============================================================================
 // ESTRUCTURAS PÚBLICAS
 // ============================================================================
@@ -70,27 +68,6 @@ int is_port_suspicious(int port, const char *service_name);
 // ============================================================================
 
 /**
- * Escanea puertos en un rango específico
- * @param start_port: Puerto inicial (1-65535)
- * @param end_port: Puerto final (1-65535)
- * @return int: 0 si es exitoso, -1 si hay error
- */
-int scan_ports(int start_port, int end_port);
-
-/**
- * Escanea puertos comunes (1-1024)
- * @return int: 0 si es exitoso, -1 si hay error
- */
-int scan_common_ports(void);
-
-/**
- * Escanea un puerto específico
- * @param port: Puerto a escanear (1-65535)
- * @return int: 1 si está abierto, 0 si cerrado, -1 si error
- */
-int scan_specific_port(int port);
-
-/**
  * Escanea un rango de puertos usando `num_threads` hilos trabajadores.
  * `cb`/`user_data` son opcionales (pueden ser NULL) y se invocan a medida
  * que cada puerto termina de escanearse — pueden llegar desde cualquier
@@ -102,16 +79,6 @@ int scan_specific_port(int port);
 int scan_ports_range(int start_port, int end_port, int num_threads,
                       ProgressCallback cb, void *user_data,
                       volatile sig_atomic_t *cancel, ScanResult *out);
-
-// ============================================================================
-// FUNCIONES AUXILIARES
-// ============================================================================
-
-/**
- * Obtiene timestamp actual
- * @return char*: String con fecha y hora actual
- */
-const char* get_current_timestamp(void);
 
 #endif // PORT_SCANNER_H
 

@@ -16,7 +16,7 @@ extern ScanProcessesCallback processes_callback;
 extern ScanPortsCallback ports_callback;
 extern ExportReportCallback report_callback;
 
-// Variables específicas del sistema de logging (definidas en gui_logging.c)
+// Variables específicas del sistema de logging (definidas en gui_logs_panel.c)
 extern GtkWidget *log_text_view;
 extern GtkTextBuffer *log_buffer;
 extern GtkTextTag *info_tag;
@@ -24,7 +24,7 @@ extern GtkTextTag *warning_tag;
 extern GtkTextTag *error_tag;
 extern GtkTextTag *alert_tag;
 
-// Variables específicas del panel de estadísticas (definidas en gui_stats.c)
+// Variables específicas del panel de estadísticas (definidas en gui_dashboard_panel.c)
 extern GtkWidget *stats_usb_count;
 extern GtkWidget *stats_usb_suspicious;
 extern GtkWidget *stats_process_count;
@@ -39,14 +39,5 @@ void on_scan_ports_clicked(GtkButton *button, gpointer data);
 void show_config_dialog(GtkWindow *parent);
 gdouble get_cpu_threshold(void);
 gdouble get_mem_threshold(void);
-gint get_usb_scan_interval(void);
-gint get_process_scan_interval(void);
-gint get_port_scan_interval(void);
-gboolean is_auto_scan_usb_enabled(void);
-gboolean is_auto_scan_processes_enabled(void);
-gboolean is_auto_scan_ports_enabled(void);
-gboolean is_sound_alerts_enabled(void);
-gboolean is_notifications_enabled(void);
-gboolean is_process_whitelisted(const char *process_name);
 
 #endif

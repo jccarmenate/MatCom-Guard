@@ -364,11 +364,3 @@ void show_config_dialog(GtkWindow *parent) {
 
 gdouble get_cpu_threshold(void) { return config.cpu_threshold; }
 gdouble get_mem_threshold(void) { return config.mem_threshold; }
-gint get_usb_scan_interval(void) { return config.usb_scan_interval; }
-gint get_process_scan_interval(void) { return config.process_scan_interval; }
-gint get_port_scan_interval(void) { return config.port_scan_interval; }
-gboolean is_auto_scan_usb_enabled(void) { return config.auto_scan_usb; }
-gboolean is_auto_scan_processes_enabled(void) { return config.auto_scan_processes; }
-gboolean is_auto_scan_ports_enabled(void) { return config.auto_scan_ports; }
-gboolean is_sound_alerts_enabled(void) { return config.enable_sound_alerts; }
-gboolean is_notifications_enabled(void) { return config.enable_notifications; }

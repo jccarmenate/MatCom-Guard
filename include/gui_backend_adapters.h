@@ -146,16 +146,6 @@ void cleanup_usb_snapshot_cache(void);
 // ============================================================================
 
 /**
- * @brief Convierte time_t a cadena de texto legible para la GUI
- * 
- * @param timestamp Timestamp a convertir
- * @param buffer Buffer donde almacenar la cadena resultante
- * @param buffer_size Tamaño del buffer
- * @return int 0 si es exitoso, -1 si hay error
- */
-int format_timestamp_for_gui(time_t timestamp, char *buffer, size_t buffer_size);
-
-/**
  * @brief Genera una cadena de estado para dispositivos USB
  * 
  * Basándose en los cambios detectados y el estado del dispositivo,
@@ -234,14 +224,5 @@ void filter_emoji_and_special_chars(const char *input, char *output, size_t outp
  * @param max_width Ancho máximo permitido por línea
  */
 void wrap_text_for_pdf(const char *input, char *output, size_t output_size, int max_width);
-
-/**
- * @brief Cuenta el número de líneas en un texto después del word wrapping
- * 
- * @param text Texto a analizar
- * @param max_width Ancho máximo por línea
- * @return int Número de líneas que ocupará el texto
- */
-int count_wrapped_lines(const char *text, int max_width);
 
 #endif // GUI_BACKEND_ADAPTERS_H

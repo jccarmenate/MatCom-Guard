@@ -251,16 +251,6 @@ static void test_adapt_device_snapshot_to_gui_utf8_boundaries(void) {
     free_device_snapshot(snap);
 }
 
-static void test_format_timestamp_for_gui(void) {
-    char buf[64];
-    assert(format_timestamp_for_gui(0, buf, sizeof(buf)) == 0);
-    assert(strcmp(buf, "Nunca") == 0);
-
-    time_t now = time(NULL);
-    assert(format_timestamp_for_gui(now - 30, buf, sizeof(buf)) == 0);
-    assert(strstr(buf, "seg") != NULL);
-}
-
 static void test_filter_and_wrap(void) {
     char out[64];
     filter_emoji_and_special_chars("Hola \xF0\x9F\x91\x8B mundo", out, sizeof(out));
@@ -270,9 +260,6 @@ static void test_filter_and_wrap(void) {
     char wrapped[128];
     wrap_text_for_pdf("una linea muy larga que debe partirse en pedazos mas chicos", wrapped, sizeof(wrapped), 10);
     assert(strchr(wrapped, '\n') != NULL);
-
-    int lines = count_wrapped_lines("corta\nuna linea muy muy muy larga que no cabe", 10);
-    assert(lines >= 3);
 }
 
 int main(void) {
@@ -285,7 +272,6 @@ int main(void) {
     test_adapt_port_info_to_gui();
     test_aggregate_port_statistics();
     test_usb_snapshot_cache();
-    test_format_timestamp_for_gui();
     test_filter_and_wrap();
     printf("test_gui_backend_adapters: OK\n");
     return 0;

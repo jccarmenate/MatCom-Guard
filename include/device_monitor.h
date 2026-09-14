@@ -105,6 +105,5 @@ DeviceSnapshot* create_device_snapshot_ex(const char *device_name,
                                            volatile sig_atomic_t *cancel,
                                            int *was_cancelled);
 void free_device_snapshot(DeviceSnapshot *snapshot);
-int validate_device_snapshot(const DeviceSnapshot *snapshot);
 
 #endif // DEVICE_MONITOR_H
